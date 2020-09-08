@@ -1,0 +1,535 @@
+<!doctype html>
+<html class="default no-js">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>@matrixai/polykey</title>
+	<meta name="description" content="Documentation for @matrixai/polykey">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<header>
+	<div class="tsd-page-toolbar">
+		<div class="container">
+			<div class="table-wrap">
+				<div class="table-cell" id="tsd-search" data-index="assets/js/search.json" data-base=".">
+					<div class="field">
+						<label for="tsd-search-field" class="tsd-widget search no-caption">Search</label>
+						<input id="tsd-search-field" type="text" />
+					</div>
+					<ul class="results">
+						<li class="state loading">Preparing search index...</li>
+						<li class="state failure">The search index is not available</li>
+					</ul>
+					<a href="index.html" class="title">@matrixai/polykey</a>
+				</div>
+				<div class="table-cell" id="tsd-widgets">
+					<div id="tsd-filter">
+						<a href="#" class="tsd-widget options no-caption" data-toggle="options">Options</a>
+						<div class="tsd-filter-group">
+							<div class="tsd-select" id="tsd-filter-visibility">
+								<span class="tsd-select-label">All</span>
+								<ul class="tsd-select-list">
+									<li data-value="public">Public</li>
+									<li data-value="protected">Public/Protected</li>
+									<li data-value="private" class="selected">All</li>
+								</ul>
+							</div>
+							<input type="checkbox" id="tsd-filter-inherited" checked />
+							<label class="tsd-widget" for="tsd-filter-inherited">Inherited</label>
+							<input type="checkbox" id="tsd-filter-externals" checked />
+							<label class="tsd-widget" for="tsd-filter-externals">Externals</label>
+							<input type="checkbox" id="tsd-filter-only-exported" />
+							<label class="tsd-widget" for="tsd-filter-only-exported">Only exported</label>
+						</div>
+					</div>
+					<a href="#" class="tsd-widget menu no-caption" data-toggle="menu">Menu</a>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="tsd-page-title">
+		<div class="container">
+			<ul class="tsd-breadcrumb">
+				<li>
+					<a href="globals.html">Globals</a>
+				</li>
+			</ul>
+			<h1>@matrixai/polykey</h1>
+		</div>
+	</div>
+</header>
+<div class="container container-main">
+	<div class="row">
+		<div class="col-8 col-content">
+			<div class="tsd-panel tsd-typography">
+				<a href="#polykey-library" id="polykey-library" style="color: inherit; text-decoration: none;">
+					<h1>Polykey (library)</h1>
+				</a>
+				<a href="#overview" id="overview" style="color: inherit; text-decoration: none;">
+					<h2>Overview</h2>
+				</a>
+				<p>js-polykey is the library used in the distributed secret sharing <code>PolyKey</code> app. You can find the actual application <a href="https://github.com/matrixai/polykey">here</a>.  A polykey node is comprised of one or many Vaults to store Secrets. These vaults are encrypted with keys derived from the master private key. Secrets always remain encrypted on disk and are only decrypted in memory. All you need to connect with and share secrets with another keynode on the same local area network is it&#39;s public key, poykey takes care of discovery. Once connected, you can securely share vaults with each other and polykey will ensure those vaults are synced.</p>
+				<p>PolyKey requires a public/private keypair for all crypto operations, this can be provided to a pre-initialized KeyManager instance before polykey is initialized or it can be generated (this is the default).</p>
+				<a href="#dependencies" id="dependencies" style="color: inherit; text-decoration: none;">
+					<h2>Dependencies</h2>
+				</a>
+				<p>The major dependencies of js-polykey are:</p>
+				<ul>
+					<li><a href="https://github.com/keybase/kbpgp">kbpgp</a> for all asymmetric cryptography.</li>
+					<li><a href="https://github.com/MatrixAI/js-encryptedfs">EncryptedFS</a> for symmetric encryption within Vaults.</li>
+					<li><a href="https://github.com/isomorphic-git/isomorphic-git">isomorphic-git</a> for version control within Vaults.</li>
+				</ul>
+				<a href="#class-dependencies" id="class-dependencies" style="color: inherit; text-decoration: none;">
+					<h2>Class Dependencies</h2>
+				</a>
+				<p>In order to better understand how the pieces of PolyKey fit together, use this dependency DAG as reference:
+				<img src="./media/dependencies.png"></p>
+				<a href="#keymanager" id="keymanager" style="color: inherit; text-decoration: none;">
+					<h2>KeyManager</h2>
+				</a>
+				<p>This class is responsible for managing the public and private keys as well as any crypto operations using those keys. The symmetric vault keys are also managed by this instance.</p>
+				<p>The KeyManager is able to be loaded separately to the PolyKey main class and then passed into PolyKey. This is useful for loading the keypair prior to initializing PolyKey.</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+// Initialize key manager first
+const keyManager = new KeyManager()
+await keyManager.loadKeyPair('./keys/private.key', './keys/public.key')
+
+// Initialize polykey instance
+const pk = new PolyKey(keyManager)
+</pre>
+				<a href="#key-generation" id="key-generation" style="color: inherit; text-decoration: none;">
+					<h3>Key Generation</h3>
+				</a>
+				<p>The key manager class can generate new symmetric keys using key derivation and the loaded private key</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+const newKey = await keyManager.generateKey('secret passphrase')
+</pre>
+				<a href="#testing" id="testing" style="color: inherit; text-decoration: none;">
+					<h2>Testing:</h2>
+				</a>
+				<p>PolyKey  uses jest to test:</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+jest
+</pre>
+				<p>The tests also rely on certificates being available in the tmp folder and environment variables set to a valid certificate authority run on the network somewhere. Please see <code>.env.example</code> for an example of these environment variables. Certificates can be generated with <code>./scripts/generate_ssl_certs.sh</code> as long as a step-ca is running on the specified url in <code>.env</code>.</p>
+				<p>Note: sometimes grpc-js can complain about the ssl certificates in <code>tmp/</code> with a non-descriptive error of &quot;No connection established&quot;. Best way to solve this is to remove the certs, start the CA server and re-issue the certs with <code>./scripts/generate_ssl_certs.sh</code>.</p>
+				<a href="#command-line-interface-cli" id="command-line-interface-cli" style="color: inherit; text-decoration: none;">
+					<h1>Command Line Interface (CLI)</h1>
+				</a>
+				<p>Here is a demo of the CLI on <a href="https://asciinema.org/a/347434">asciinema</a>.</p>
+				<p>The PolyKey CLI exposes various git-style sub commands that can be used to manipulate the PolyKey node:</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+Usage: polykey [options] [command]
+
+Options:
+  --version       output the current version
+  -h, --help      display help for command
+
+Commands:
+  keys            manipulate keys
+  secrets         manipulate secrets for a given vault
+  vaults          manipulate vaults
+  crypto          crypto operations
+  agent           control the polykey agent
+  help [command]  display help for command
+</pre>
+				<p>Usage looks like the following:</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+polykey agent ...
+polykey vaults ...
+
+# Sub commands are heirarchical like so:
+polykey vaults new ...
+polykey secrets delete ...
+</pre>
+				<p>PolyKey also exposes a helpful alias, <code>pk</code>, to make typing out commands a little quicker:</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+pk secrets ...
+pk crypto ...
+</pre>
+				<p>If you ever get stuck, every sub command has a help flag:</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+# Either one of -h or --help will do
+pk -h
+pk vaults --help
+pk secrets new -h
+</pre>
+				<a href="#agent" id="agent" style="color: inherit; text-decoration: none;">
+					<h2>Agent</h2>
+				</a>
+				<p>With this command you can manipulate the polykey agent including starting/restarting/stopping the agent, creating/importing a new polykey node, and getting the agent status.</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+Usage: polykey agent [options] [command]
+
+control the polykey agent
+
+Options:
+  -h, --help         display help for command
+
+Commands:
+  start [options]    start the agent
+  restart [options]  restart the agent
+  status             retrieve the status of the agent
+  stop [options]     stop the agent
+  list|ls [options]  list all the nodes controlled by the node
+  create [options]   create a new polykey node
+  load [options]     load an existing polykey node
+  help [command]     display help for command
+</pre>
+				<p>Example  usage:</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+# managing the polykey agent
+pk agent stop
+pk agent start
+# restart the agent as a daemon
+pk agent restart -d
+pk agent status # agent status is 'online'
+
+# create a new polykey node
+pk agent create -k '~/NewPolykeyNode' -n 'John Smith' -e 'john@email.com' -p 'passphrase'
+
+# load an existing node
+pk agent load -k '~/NewPolykeyNode' -p 'passphrase'
+
+# list the nodes managed by agent
+pk agent list # ~/NewPolykeyNode
+</pre>
+				<p>Note: Polykey also provides the ability to set an environment variable, <code>KEYNODE_PATH</code>, instead of specifying the node path with <code>-k &#39;~/NewPolykeyNode&#39;</code></p>
+				<a href="#keys" id="keys" style="color: inherit; text-decoration: none;">
+					<h2>Keys</h2>
+				</a>
+				<p>This command is used to interact with PolyKey&#39;s KeyManager. With this command you can generate new keys, list keys and more.</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+Usage: polykey keys [options] [command]
+
+manipulate keys
+
+Options:
+  -h, --help         display help for command
+
+Commands:
+  new [options]      derive a new symmetric key
+  delete [options]   delete a symmetric key from the key manager
+  list|ls [options]  list all symmetric keys in the keynode
+  get [options]      get the contents of a specific symmetric key
+  primary [options]  get the contents of the primary keypair
+  help [command]     display help for command
+</pre>
+				<p>Example  usage:</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+# create a new key
+pk keys new -n 'NewKey' -p 'Key Passphrase'
+
+# deleting an existing key
+pk keys delete -n 'NewKey'
+
+# list all existing keys
+pk keys list # 'NewKey'
+
+# list primary key with private key included
+pk keys primary -p
+# Public Key:
+# -----BEGIN PGP PUBLIC KEY BLOCK-----
+# ...
+# -----END PGP PUBLIC KEY BLOCK-----
+#
+# Private Key:
+# -----BEGIN PGP PRIVATE KEY BLOCK-----
+# ...
+# -----END PGP PRIVATE KEY BLOCK-----
+</pre>
+				<a href="#vaults" id="vaults" style="color: inherit; text-decoration: none;">
+					<h2>Vaults</h2>
+				</a>
+				<p>The vaults sub command lets you manipulate vaults, e.g. to list the existing vaults, add a new vault or destroy an old vault.</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+Usage: polykey vaults [options] [command]
+
+manipulate vaults
+
+Options:
+  -h, --help            display help for command
+
+Commands:
+  list|ls [options]     list all available vaults
+  new [options]         create new vault(s)
+  delete|del [options]  delete an existing vault
+  help [command]        display help for command
+</pre>
+				<p>Example usage:</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+# create a new vault
+pk vaults add 'NewVault'
+
+# list all existing vaults
+pk vaults ls # 'NewVault'
+
+# delete a vault
+pk vaults delete 'NewVault'
+</pre>
+				<a href="#secrets" id="secrets" style="color: inherit; text-decoration: none;">
+					<h2>Secrets</h2>
+				</a>
+				<p>The secrets sub command lets you manipulate secrets in a specific vault such as adding new secrets, removing old secrets or modifying existing secrets. In addition, polykey can inject variables into a modified environment with the <code>pk secrets env</code> command.</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+Usage: polykey secrets [options] [command]
+
+manipulate secrets for a given vault
+
+Options:
+  -h, --help            display help for command
+
+Commands:
+  list|ls [options]     list all available secrets for a given vault
+  new [options]         create a secret within a given vault, specify an secret
+                        path with '&lt;vaultName>:&lt;secretName>'
+  update [options]      update a secret within a given vault, specify an secret
+                        path with '&lt;vaultName>:&lt;secretName>'
+  delete|del [options]  delete a secret from a given vault, specify an secret
+                        path with '&lt;vaultName>:&lt;secretName>'
+  get [options]         retrieve a secret from a given vault, specify an secret
+                        path with '&lt;vaultName>:&lt;secretName>'
+  env [options]         run a modified environment with injected secrets,
+                        specify an secret path with '&lt;vaultName>:&lt;secretName>'
+  help [command]        display help for command
+</pre>
+				<p>Example usage:</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+# add a new secret
+pk secrets add -f '~/SeretFile' NewVault:NewSecret
+
+# list names of all secrets within specific vaults
+pk secrets list NewVault AnotherVault
+# 1. NewVault:NewSecret
+# 2. AnotherVault:AnotherSecret
+
+# delete secrets
+pk secrets delete NewVault:NewSecret AnotherVault:AnotherSecret
+
+# retreive a secret
+pk secrets get NewVault:NewSecret
+# &lt;NewSecretContent>
+
+# enter a modified environment with injected secrets
+pk secrets env NewVault:NewSecret=SECRET_1 AnotherVault:AnotherSecret=SECRET_2
+
+# enter a modified environment with injected secrets and execute a command
+pk secrets env NewVault:NewSecret=SECRET_1 --command="echo $SECRET_1"
+</pre>
+				<a href="#crypto" id="crypto" style="color: inherit; text-decoration: none;">
+					<h2>Crypto</h2>
+				</a>
+				<p>The crypto sub command allows you to perform asymmetric cryptography operations (sign/encrypt/verify/decrypt) on files using the loaded public/prvate keypair.</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+Usage: polykey crypto [options] [command]
+
+crypto operations
+
+Options:
+  -h, --help         display help for command
+
+Commands:
+  verify [options]   verification operations
+  sign [options]     signing operations [files]
+  encrypt [options]  encryption operations
+  decrypt [options]  decryption operations
+  help [command]     display help for command
+</pre>
+				<p>Example usage:</p>
+				<pre style="white-space:pre !important; overflow-x:scroll !important">
+# sign a file and store as a detached signature
+pk crypto sign ./file # creates ./file.sig
+
+# verify a file
+pk crypto verify -f ./file.sig
+
+# encrypt a file
+pk crypto encrypt ./file
+
+# decrypt a file
+pk crypto decrypt ./file
+</pre>
+				<a href="#verbosity" id="verbosity" style="color: inherit; text-decoration: none;">
+					<h2>Verbosity</h2>
+				</a>
+				<p>TODO: explain verbosity levels when it is implemented</p>
+				<a href="#build" id="build" style="color: inherit; text-decoration: none;">
+					<h1>Build</h1>
+				</a>
+				<a href="#proto-files" id="proto-files" style="color: inherit; text-decoration: none;">
+					<h2>Proto Files</h2>
+				</a>
+				<p>All <code>.proto</code> files are stored in the the <code>proto</code> directory. JavaScript and type definition files are build using the following command:</p>
+				<pre><code>npm <span class="hljs-keyword">run</span><span class="bash"> build:proto</span></code></pre>
+			</div>
+		</div>
+		<div class="col-4 col-menu menu-sticky-wrap menu-highlight">
+			<nav class="tsd-navigation primary">
+				<ul>
+					<li class="globals  ">
+						<a href="globals.html"><em>Globals</em></a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_proto_js_agent_.html">&quot;proto/js/<wbr>Agent&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_proto_js_git_.html">&quot;proto/js/<wbr>Git&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_proto_js_peer_.html">&quot;proto/js/<wbr>Peer&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_polykey_.html">&quot;src/lib/<wbr>Polykey&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_agent_polykeyagent_.html">&quot;src/lib/agent/<wbr>Polykey<wbr>Agent&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_agent_polykeyclient_.html">&quot;src/lib/agent/<wbr>Polykey<wbr>Client&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_agent_internal_daemon_script_.html">&quot;src/lib/agent/internal/daemon-<wbr>script&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_gitbackend_.html">&quot;src/lib/git/<wbr>Git<wbr>Backend&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_gitfrontend_.html">&quot;src/lib/git/<wbr>Git<wbr>Frontend&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_gitrequest_.html">&quot;src/lib/git/<wbr>Git<wbr>Request&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_pack_objects_gitcommit_.html">&quot;src/lib/git/pack-<wbr>objects/<wbr>Git<wbr>Commit&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_pack_objects_gitobject_.html">&quot;src/lib/git/pack-<wbr>objects/<wbr>Git<wbr>Object&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_pack_objects_gitobjectmanager_.html">&quot;src/lib/git/pack-<wbr>objects/<wbr>Git<wbr>Object<wbr>Manager&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_pack_objects_gittree_.html">&quot;src/lib/git/pack-<wbr>objects/<wbr>Git<wbr>Tree&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_pack_objects_log_.html">&quot;src/lib/git/pack-<wbr>objects/log&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_pack_objects_packobjects_.html">&quot;src/lib/git/pack-<wbr>objects/pack<wbr>Objects&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_pack_objects_shasum_.html">&quot;src/lib/git/pack-<wbr>objects/shasum&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_side_band_gitsideband_.html">&quot;src/lib/git/side-<wbr>band/<wbr>Git<wbr>Side<wbr>Band&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_upload_pack_gitpackedrefs_.html">&quot;src/lib/git/upload-<wbr>pack/<wbr>Git<wbr>Packed<wbr>Refs&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_upload_pack_gitpktline_.html">&quot;src/lib/git/upload-<wbr>pack/<wbr>Git<wbr>Pkt<wbr>Line&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_upload_pack_gitrefmanager_.html">&quot;src/lib/git/upload-<wbr>pack/<wbr>Git<wbr>Ref<wbr>Manager&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_git_upload_pack_uploadpack_.html">&quot;src/lib/git/upload-<wbr>pack/upload<wbr>Pack&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_keys_keymanager_.html">&quot;src/lib/keys/<wbr>Key<wbr>Manager&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_keys_keymanagerworker_.html">&quot;src/lib/keys/<wbr>Key<wbr>Manager<wbr>Worker&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_keys_pki_publickeyinfrastructure_.html">&quot;src/lib/keys/pki/<wbr>Public<wbr>Key<wbr>Infrastructure&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_multicastbroadcaster_.html">&quot;src/lib/peers/<wbr>Multicast<wbr>Broadcaster&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_peerinfo_.html">&quot;src/lib/peers/<wbr>Peer<wbr>Info&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_peermanager_.html">&quot;src/lib/peers/<wbr>Peer<wbr>Manager&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_peer_connection_peerconnection_.html">&quot;src/lib/peers/peer-<wbr>connection/<wbr>Peer<wbr>Connection&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_peer_connection_peerserver_.html">&quot;src/lib/peers/peer-<wbr>connection/<wbr>Peer<wbr>Server&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_tcp_hole_punch_tcpholepunchclient_.html">&quot;src/lib/peers/tcp-<wbr>hole-<wbr>punch/TCPHole<wbr>Punch<wbr>Client&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_tcp_hole_punch_tcpholepunchserver_.html">&quot;src/lib/peers/tcp-<wbr>hole-<wbr>punch/TCPHole<wbr>Punch<wbr>Server&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_turn_turnclient_.html">&quot;src/lib/peers/turn/<wbr>Turn<wbr>Client&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_turn_turnserver_.html">&quot;src/lib/peers/turn/<wbr>Turn<wbr>Server&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_udp_hole_punch_microtransportprotocol_.html">&quot;src/lib/peers/udp-<wbr>hole-<wbr>punch/<wbr>Micro<wbr>Transport<wbr>Protocol&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_udp_hole_punch_udpholepunchclient_.html">&quot;src/lib/peers/udp-<wbr>hole-<wbr>punch/UDPHole<wbr>Punch<wbr>Client&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_udp_hole_punch_udpholepunchserver_.html">&quot;src/lib/peers/udp-<wbr>hole-<wbr>punch/UDPHole<wbr>Punch<wbr>Server&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_udp_hole_punch_socket_pipes_tcptoudpsocketpipe_.html">&quot;src/lib/peers/udp-<wbr>hole-<wbr>punch/socket-<wbr>pipes/TCPToUDPSocket<wbr>Pipe&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_peers_udp_hole_punch_socket_pipes_udptotcpsocketpipe_.html">&quot;src/lib/peers/udp-<wbr>hole-<wbr>punch/socket-<wbr>pipes/UDPToTCPSocket<wbr>Pipe&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_utils_.html">&quot;src/lib/utils&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_vaults_vault_.html">&quot;src/lib/vaults/<wbr>Vault&quot;</a>
+					</li>
+					<li class=" tsd-kind-module">
+						<a href="modules/_src_lib_vaults_vaultmanager_.html">&quot;src/lib/vaults/<wbr>Vault<wbr>Manager&quot;</a>
+					</li>
+				</ul>
+			</nav>
+			<nav class="tsd-navigation secondary menu-sticky">
+				<ul class="before-current">
+				</ul>
+			</nav>
+		</div>
+	</div>
+</div>
+<footer class="with-border-bottom">
+	<div class="container">
+		<h2>Legend</h2>
+		<div class="tsd-legend-group">
+			<ul class="tsd-legend">
+				<li class="tsd-kind-object-literal"><span class="tsd-kind-icon">Object literal</span></li>
+				<li class="tsd-kind-variable"><span class="tsd-kind-icon">Variable</span></li>
+				<li class="tsd-kind-function"><span class="tsd-kind-icon">Function</span></li>
+				<li class="tsd-kind-function tsd-has-type-parameter"><span class="tsd-kind-icon">Function with type parameter</span></li>
+				<li class="tsd-kind-type-alias"><span class="tsd-kind-icon">Type alias</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-interface"><span class="tsd-kind-icon">Interface</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-class"><span class="tsd-kind-icon">Class</span></li>
+			</ul>
+		</div>
+	</div>
+</footer>
+<div class="container tsd-generator">
+	<p>Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p>
+</div>
+<div class="overlay"></div>
+<script src="assets/js/main.js"></script>
+</body>
+</html>
