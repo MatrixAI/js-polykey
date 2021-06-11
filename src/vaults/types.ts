@@ -1,4 +1,10 @@
 import type Vault from './Vault';
+import type { Opaque } from '../types';
+
+/**
+ * Randomly generated vault ID for each new vault
+ */
+type VaultId = Opaque<'VaultId', string>;
 
 type VaultKey = Buffer;
 
@@ -29,4 +35,4 @@ type FileChange = {
 
 type FileChanges = Array<FileChange>;
 
-export type { VaultKey, Vaults, NodePermissions, ACL, FileChange, FileChanges };
+export type { VaultKey, Vaults, NodePermissions, ACL, FileChange, FileChanges, VaultId };
