@@ -221,6 +221,21 @@ class ACL {
   }
 
   /**
+   * Sets the vault using an existing vault name
+   * If the existing vault name doesn't exist, nothing will change
+   */
+     public async setVaultNameByVaultId(vaultName: string, newVaultName: string): Promise<void> {
+      await this._transaction(async () => {
+        const vaultId = await this.getAclDb('names', vaultName);
+        if (!vaultId) {
+          return;
+        }
+        await this.delVaultAclDb('names', vaultName);
+        await this.putVaultAclDb('names', newVaultName, vaultId);
+      });
+    }
+
+  /**
    * Deletes a vault using an existing vault name
    * If the existing vault name doesn't exist, nothing will change
    */
