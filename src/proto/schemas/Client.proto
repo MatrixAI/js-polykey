@@ -7,6 +7,14 @@ service Client {
 
   // Nodes
   rpc NodesList(EmptyMessage) returns (stream NodeMessage) {};
+  //TODO: These are placeholder. subject to change.
+  rpc NodesGetLocalInfo(EmptyMessage) returns (NodeInfoMessage) {};
+  rpc NodesUpdateLocalInfo(NodeInfoMessage) returns (EmptyMessage) {};
+  rpc NodesGetInfo(NodeMessage) returns (NodeInfoMessage) {};
+  rpc NodesUpdateInfo(EmptyMessage) returns (EmptyMessage) {}; //WIP
+  rpc NodesPing(NodeMessage) returns (StatusMessage) {};
+  rpc NodesAdd(EmptyMessage) returns (EmptyMessage) {}; //WIP
+  rpc NodesFind(NodeMessage) returns (EmptyMessage) {};
 
   // Keys
   rpc KeysRootKeyPair (EmptyMessage) returns (KeyPairMessage) {};
@@ -106,6 +114,52 @@ message StatMessage {
 message NodeMessage {
   string name = 1;
 }
+
+//TODO: These are placeholder. subject to change.
+message NodeInfoMessage {
+  // This is a hash of the public key that uniquely identifies the node
+  string node_id = 1;
+
+  // This is keynode alias that is attached to each identity (x.509) certificate
+  // oid: 1.3.1.4.1
+  string alias = 2;
+
+  // This is the public key that cryptographically identifies this keynode
+  string public_key = 3;
+
+  // The root public key is the crypto-identity that this keynode
+  // is "crypto-link"-ed to. This is empty by default for keynodes
+  // that do not belong to a heirarchy
+  // oid: 1.3.1.4.2
+  string root_public_key = 4;
+
+  // This is the known address (e.g. '132.454.243.21:1314') on which the keynode can be found
+  // oid: 1.3.1.4.3
+  string node_address = 5;
+
+  // This address is where the keynode's HTTP API is served
+  // oid: 1.3.1.4.4
+  string api_address = 6;
+
+  // The LinkInfo list
+  // oid: 1.3.1.4.5
+  repeated LinkInfoIdentityMessage link_info = 7;
+
+  // This is the original pem x.509 certificate that is signed
+  // by the private key of the node
+  string pem = 8;
+} //May have to change structure of this.
+
+message LinkInfoIdentityMessage {
+  string type = 1;
+  string node = 2;
+  string identity = 3;
+  string provider = 4;
+  string dateIssued = 5;
+  string signature = 6;
+  string key = 7;
+  string url = 8;
+} //May have to change structure of this.
 
 // Keys
 

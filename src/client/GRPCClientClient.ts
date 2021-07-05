@@ -283,6 +283,73 @@ class GRPCClientClient extends GRPCClient<ClientClient> {
       this.client.providersGet,
     )(...args);
   }
+
+  //TODO: These are placeholder. subject to change.
+  public nodesList(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyReadableStreamCall<clientPB.NodeMessage>(
+      this.client,
+      this.client.nodesList,
+    )(...args);
+  }
+
+  public NodesGetLocalInfo(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.NodeInfoMessage>(
+      this.client,
+      this.client.nodesGetLocalInfo,
+    )(...args);
+  }
+
+  public NodesUpdateLocalInfo(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.EmptyMessage>(
+      this.client,
+      this.client.nodesUpdateLocalInfo,
+    )(...args);
+  }
+
+  public NodesGetInfo(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.NodeInfoMessage>(
+      this.client,
+      this.client.nodesGetInfo,
+    )(...args);
+  }
+
+  public NodesUpdateInfo(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.EmptyMessage>(
+      this.client,
+      this.client.nodesUpdateInfo,
+    )(...args);
+  }
+
+  public NodesPing(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.StatusMessage>(
+      this.client,
+      this.client.nodesPing,
+    )(...args);
+  }
+
+  public NodesAdd(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.EmptyMessage>(
+      this.client,
+      this.client.nodesAdd,
+    )(...args);
+  }
+
+  public NodesFind(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.EmptyMessage>(
+      this.client,
+      this.client.nodesFind,
+    )(...args);
+  }
+
+
 }
 
 export default GRPCClientClient;
