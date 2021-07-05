@@ -16,6 +16,7 @@ import * as clientPB from '../proto/js/Client_pb';
 import createEchoRPC from './rpcEcho';
 import createVaultRPC from './rpcVaults';
 import createKeysRPC from './rpcKeys';
+import createNodeRPC from './rpcNodes';
 import createGestaltRPC from './rpcGestalts';
 import createIdentitiesRPC from './rpcIdentities';
 
@@ -52,6 +53,7 @@ function createClientService({
       keyManager: keyManager,
       sessionManager: sessionManager,
     }),
+    ...createNodeRPC({nodeManager: nodeManager}),
     ...createIdentitiesRPC({ identitiesManager: identitiesManager }),
     ...createGestaltRPC({ gestaltGraph: gestaltGraph }),
     nodesList: async (
