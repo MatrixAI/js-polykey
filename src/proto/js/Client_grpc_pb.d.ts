@@ -5,7 +5,6 @@
 /* eslint-disable */
 
 import * as grpc from "@grpc/grpc-js";
-import {handleClientStreamingCall} from "@grpc/grpc-js/build/src/server-call";
 import * as Client_pb from "./Client_pb";
 
 interface IClientService extends grpc.ServiceDefinition<grpc.UntypedServiceImplementation> {
@@ -46,11 +45,22 @@ interface IClientService extends grpc.ServiceDefinition<grpc.UntypedServiceImple
     tokensGet: IClientService_ITokensGet;
     tokensDelete: IClientService_ITokensDelete;
     providersGet: IClientService_IProvidersGet;
+    identitiesGetConnectedInfos: IClientService_IIdentitiesGetConnectedInfos;
+    identitiesGetInfo: IClientService_IIdentitiesGetInfo;
+    identitiesAugmentKeynode: IClientService_IIdentitiesAugmentKeynode;
     gestaltsGetNode: IClientService_IGestaltsGetNode;
     gestaltsGetIdentity: IClientService_IGestaltsGetIdentity;
     gestaltsList: IClientService_IGestaltsList;
     gestaltsSetNode: IClientService_IGestaltsSetNode;
     gestaltsSetIdentity: IClientService_IGestaltsSetIdentity;
+    gestaltsDiscoverNode: IClientService_IGestaltsDiscoverNode;
+    gestaltsDiscoverIdentity: IClientService_IGestaltsDiscoverIdentity;
+    gestaltsGetActionsByNode: IClientService_IGestaltsGetActionsByNode;
+    gestaltsGetActionsByIdentity: IClientService_IGestaltsGetActionsByIdentity;
+    gestaltsSetActionByNode: IClientService_IGestaltsSetActionByNode;
+    gestaltsSetActionByIdentity: IClientService_IGestaltsSetActionByIdentity;
+    gestaltsUnsetActionByNode: IClientService_IGestaltsUnsetActionByNode;
+    gestaltsUnsetActionByIdentity: IClientService_IGestaltsUnsetActionByIdentity;
     gestaltSync: IClientService_IGestaltSync;
 }
 
@@ -345,7 +355,7 @@ interface IClientService_IVaultsPermissions extends grpc.MethodDefinition<Client
 interface IClientService_IIdentitiesAuthenticate extends grpc.MethodDefinition<Client_pb.ProviderMessage, Client_pb.ProviderMessage> {
     path: "/clientInterface.Client/IdentitiesAuthenticate";
     requestStream: false;
-    responseStream: false;
+    responseStream: true;
     requestSerialize: grpc.serialize<Client_pb.ProviderMessage>;
     requestDeserialize: grpc.deserialize<Client_pb.ProviderMessage>;
     responseSerialize: grpc.serialize<Client_pb.ProviderMessage>;
@@ -387,12 +397,39 @@ interface IClientService_IProvidersGet extends grpc.MethodDefinition<Client_pb.E
     responseSerialize: grpc.serialize<Client_pb.ProviderMessage>;
     responseDeserialize: grpc.deserialize<Client_pb.ProviderMessage>;
 }
-interface IClientService_IGestaltsGetNode extends grpc.MethodDefinition<Client_pb.GestaltMessage, Client_pb.GestaltMessage> {
+interface IClientService_IIdentitiesGetConnectedInfos extends grpc.MethodDefinition<Client_pb.ProviderSearchMessage, Client_pb.IdentityInfoMessage> {
+    path: "/clientInterface.Client/IdentitiesGetConnectedInfos";
+    requestStream: false;
+    responseStream: true;
+    requestSerialize: grpc.serialize<Client_pb.ProviderSearchMessage>;
+    requestDeserialize: grpc.deserialize<Client_pb.ProviderSearchMessage>;
+    responseSerialize: grpc.serialize<Client_pb.IdentityInfoMessage>;
+    responseDeserialize: grpc.deserialize<Client_pb.IdentityInfoMessage>;
+}
+interface IClientService_IIdentitiesGetInfo extends grpc.MethodDefinition<Client_pb.ProviderMessage, Client_pb.ProviderMessage> {
+    path: "/clientInterface.Client/IdentitiesGetInfo";
+    requestStream: false;
+    responseStream: false;
+    requestSerialize: grpc.serialize<Client_pb.ProviderMessage>;
+    requestDeserialize: grpc.deserialize<Client_pb.ProviderMessage>;
+    responseSerialize: grpc.serialize<Client_pb.ProviderMessage>;
+    responseDeserialize: grpc.deserialize<Client_pb.ProviderMessage>;
+}
+interface IClientService_IIdentitiesAugmentKeynode extends grpc.MethodDefinition<Client_pb.ProviderMessage, Client_pb.EmptyMessage> {
+    path: "/clientInterface.Client/IdentitiesAugmentKeynode";
+    requestStream: false;
+    responseStream: false;
+    requestSerialize: grpc.serialize<Client_pb.ProviderMessage>;
+    requestDeserialize: grpc.deserialize<Client_pb.ProviderMessage>;
+    responseSerialize: grpc.serialize<Client_pb.EmptyMessage>;
+    responseDeserialize: grpc.deserialize<Client_pb.EmptyMessage>;
+}
+interface IClientService_IGestaltsGetNode extends grpc.MethodDefinition<Client_pb.NodeMessage, Client_pb.GestaltMessage> {
     path: "/clientInterface.Client/GestaltsGetNode";
     requestStream: false;
     responseStream: false;
-    requestSerialize: grpc.serialize<Client_pb.GestaltMessage>;
-    requestDeserialize: grpc.deserialize<Client_pb.GestaltMessage>;
+    requestSerialize: grpc.serialize<Client_pb.NodeMessage>;
+    requestDeserialize: grpc.deserialize<Client_pb.NodeMessage>;
     responseSerialize: grpc.serialize<Client_pb.GestaltMessage>;
     responseDeserialize: grpc.deserialize<Client_pb.GestaltMessage>;
 }
@@ -429,6 +466,78 @@ interface IClientService_IGestaltsSetIdentity extends grpc.MethodDefinition<Clie
     responseStream: false;
     requestSerialize: grpc.serialize<Client_pb.GestaltTrustMessage>;
     requestDeserialize: grpc.deserialize<Client_pb.GestaltTrustMessage>;
+    responseSerialize: grpc.serialize<Client_pb.EmptyMessage>;
+    responseDeserialize: grpc.deserialize<Client_pb.EmptyMessage>;
+}
+interface IClientService_IGestaltsDiscoverNode extends grpc.MethodDefinition<Client_pb.NodeMessage, Client_pb.EmptyMessage> {
+    path: "/clientInterface.Client/GestaltsDiscoverNode";
+    requestStream: false;
+    responseStream: false;
+    requestSerialize: grpc.serialize<Client_pb.NodeMessage>;
+    requestDeserialize: grpc.deserialize<Client_pb.NodeMessage>;
+    responseSerialize: grpc.serialize<Client_pb.EmptyMessage>;
+    responseDeserialize: grpc.deserialize<Client_pb.EmptyMessage>;
+}
+interface IClientService_IGestaltsDiscoverIdentity extends grpc.MethodDefinition<Client_pb.ProviderMessage, Client_pb.EmptyMessage> {
+    path: "/clientInterface.Client/GestaltsDiscoverIdentity";
+    requestStream: false;
+    responseStream: false;
+    requestSerialize: grpc.serialize<Client_pb.ProviderMessage>;
+    requestDeserialize: grpc.deserialize<Client_pb.ProviderMessage>;
+    responseSerialize: grpc.serialize<Client_pb.EmptyMessage>;
+    responseDeserialize: grpc.deserialize<Client_pb.EmptyMessage>;
+}
+interface IClientService_IGestaltsGetActionsByNode extends grpc.MethodDefinition<Client_pb.NodeMessage, Client_pb.ActionsMessage> {
+    path: "/clientInterface.Client/GestaltsGetActionsByNode";
+    requestStream: false;
+    responseStream: false;
+    requestSerialize: grpc.serialize<Client_pb.NodeMessage>;
+    requestDeserialize: grpc.deserialize<Client_pb.NodeMessage>;
+    responseSerialize: grpc.serialize<Client_pb.ActionsMessage>;
+    responseDeserialize: grpc.deserialize<Client_pb.ActionsMessage>;
+}
+interface IClientService_IGestaltsGetActionsByIdentity extends grpc.MethodDefinition<Client_pb.ProviderMessage, Client_pb.ActionsMessage> {
+    path: "/clientInterface.Client/GestaltsGetActionsByIdentity";
+    requestStream: false;
+    responseStream: false;
+    requestSerialize: grpc.serialize<Client_pb.ProviderMessage>;
+    requestDeserialize: grpc.deserialize<Client_pb.ProviderMessage>;
+    responseSerialize: grpc.serialize<Client_pb.ActionsMessage>;
+    responseDeserialize: grpc.deserialize<Client_pb.ActionsMessage>;
+}
+interface IClientService_IGestaltsSetActionByNode extends grpc.MethodDefinition<Client_pb.SetActionsMessage, Client_pb.EmptyMessage> {
+    path: "/clientInterface.Client/GestaltsSetActionByNode";
+    requestStream: false;
+    responseStream: false;
+    requestSerialize: grpc.serialize<Client_pb.SetActionsMessage>;
+    requestDeserialize: grpc.deserialize<Client_pb.SetActionsMessage>;
+    responseSerialize: grpc.serialize<Client_pb.EmptyMessage>;
+    responseDeserialize: grpc.deserialize<Client_pb.EmptyMessage>;
+}
+interface IClientService_IGestaltsSetActionByIdentity extends grpc.MethodDefinition<Client_pb.SetActionsMessage, Client_pb.EmptyMessage> {
+    path: "/clientInterface.Client/GestaltsSetActionByIdentity";
+    requestStream: false;
+    responseStream: false;
+    requestSerialize: grpc.serialize<Client_pb.SetActionsMessage>;
+    requestDeserialize: grpc.deserialize<Client_pb.SetActionsMessage>;
+    responseSerialize: grpc.serialize<Client_pb.EmptyMessage>;
+    responseDeserialize: grpc.deserialize<Client_pb.EmptyMessage>;
+}
+interface IClientService_IGestaltsUnsetActionByNode extends grpc.MethodDefinition<Client_pb.SetActionsMessage, Client_pb.EmptyMessage> {
+    path: "/clientInterface.Client/GestaltsUnsetActionByNode";
+    requestStream: false;
+    responseStream: false;
+    requestSerialize: grpc.serialize<Client_pb.SetActionsMessage>;
+    requestDeserialize: grpc.deserialize<Client_pb.SetActionsMessage>;
+    responseSerialize: grpc.serialize<Client_pb.EmptyMessage>;
+    responseDeserialize: grpc.deserialize<Client_pb.EmptyMessage>;
+}
+interface IClientService_IGestaltsUnsetActionByIdentity extends grpc.MethodDefinition<Client_pb.SetActionsMessage, Client_pb.EmptyMessage> {
+    path: "/clientInterface.Client/GestaltsUnsetActionByIdentity";
+    requestStream: false;
+    responseStream: false;
+    requestSerialize: grpc.serialize<Client_pb.SetActionsMessage>;
+    requestDeserialize: grpc.deserialize<Client_pb.SetActionsMessage>;
     responseSerialize: grpc.serialize<Client_pb.EmptyMessage>;
     responseDeserialize: grpc.deserialize<Client_pb.EmptyMessage>;
 }
@@ -477,16 +586,27 @@ export interface IClientServer extends grpc.UntypedServiceImplementation {
     vaultsNewDirSecret: grpc.handleUnaryCall<Client_pb.SecretNewMessage, Client_pb.EmptyMessage>;
     vaultsShare: grpc.handleUnaryCall<Client_pb.ShareMessage, Client_pb.EmptyMessage>;
     vaultsPermissions: grpc.handleServerStreamingCall<Client_pb.ShareMessage, Client_pb.PermissionMessage>;
-    identitiesAuthenticate: grpc.handleUnaryCall<Client_pb.ProviderMessage, Client_pb.ProviderMessage>;
+    identitiesAuthenticate: grpc.handleServerStreamingCall<Client_pb.ProviderMessage, Client_pb.ProviderMessage>;
     tokensPut: grpc.handleUnaryCall<Client_pb.TokenSpecificMessage, Client_pb.EmptyMessage>;
     tokensGet: grpc.handleUnaryCall<Client_pb.ProviderMessage, Client_pb.TokenMessage>;
     tokensDelete: grpc.handleUnaryCall<Client_pb.ProviderMessage, Client_pb.EmptyMessage>;
     providersGet: grpc.handleUnaryCall<Client_pb.EmptyMessage, Client_pb.ProviderMessage>;
-    gestaltsGetNode: grpc.handleUnaryCall<Client_pb.GestaltMessage, Client_pb.GestaltMessage>;
+    identitiesGetConnectedInfos: grpc.handleServerStreamingCall<Client_pb.ProviderSearchMessage, Client_pb.IdentityInfoMessage>;
+    identitiesGetInfo: grpc.handleUnaryCall<Client_pb.ProviderMessage, Client_pb.ProviderMessage>;
+    identitiesAugmentKeynode: grpc.handleUnaryCall<Client_pb.ProviderMessage, Client_pb.EmptyMessage>;
+    gestaltsGetNode: grpc.handleUnaryCall<Client_pb.NodeMessage, Client_pb.GestaltMessage>;
     gestaltsGetIdentity: grpc.handleUnaryCall<Client_pb.ProviderMessage, Client_pb.GestaltMessage>;
     gestaltsList: grpc.handleServerStreamingCall<Client_pb.EmptyMessage, Client_pb.GestaltMessage>;
     gestaltsSetNode: grpc.handleUnaryCall<Client_pb.GestaltTrustMessage, Client_pb.EmptyMessage>;
     gestaltsSetIdentity: grpc.handleUnaryCall<Client_pb.GestaltTrustMessage, Client_pb.EmptyMessage>;
+    gestaltsDiscoverNode: grpc.handleUnaryCall<Client_pb.NodeMessage, Client_pb.EmptyMessage>;
+    gestaltsDiscoverIdentity: grpc.handleUnaryCall<Client_pb.ProviderMessage, Client_pb.EmptyMessage>;
+    gestaltsGetActionsByNode: grpc.handleUnaryCall<Client_pb.NodeMessage, Client_pb.ActionsMessage>;
+    gestaltsGetActionsByIdentity: grpc.handleUnaryCall<Client_pb.ProviderMessage, Client_pb.ActionsMessage>;
+    gestaltsSetActionByNode: grpc.handleUnaryCall<Client_pb.SetActionsMessage, Client_pb.EmptyMessage>;
+    gestaltsSetActionByIdentity: grpc.handleUnaryCall<Client_pb.SetActionsMessage, Client_pb.EmptyMessage>;
+    gestaltsUnsetActionByNode: grpc.handleUnaryCall<Client_pb.SetActionsMessage, Client_pb.EmptyMessage>;
+    gestaltsUnsetActionByIdentity: grpc.handleUnaryCall<Client_pb.SetActionsMessage, Client_pb.EmptyMessage>;
     gestaltSync: grpc.handleBidiStreamingCall<Client_pb.GestaltMessage, Client_pb.GestaltMessage>;
 }
 
@@ -581,9 +701,8 @@ export interface IClientClient {
     vaultsShare(request: Client_pb.ShareMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
     vaultsPermissions(request: Client_pb.ShareMessage, options?: Partial<grpc.CallOptions>): grpc.ClientReadableStream<Client_pb.PermissionMessage>;
     vaultsPermissions(request: Client_pb.ShareMessage, metadata?: grpc.Metadata, options?: Partial<grpc.CallOptions>): grpc.ClientReadableStream<Client_pb.PermissionMessage>;
-    identitiesAuthenticate(request: Client_pb.ProviderMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
-    identitiesAuthenticate(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
-    identitiesAuthenticate(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
+    identitiesAuthenticate(request: Client_pb.ProviderMessage, options?: Partial<grpc.CallOptions>): grpc.ClientReadableStream<Client_pb.ProviderMessage>;
+    identitiesAuthenticate(request: Client_pb.ProviderMessage, metadata?: grpc.Metadata, options?: Partial<grpc.CallOptions>): grpc.ClientReadableStream<Client_pb.ProviderMessage>;
     tokensPut(request: Client_pb.TokenSpecificMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
     tokensPut(request: Client_pb.TokenSpecificMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
     tokensPut(request: Client_pb.TokenSpecificMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
@@ -596,9 +715,17 @@ export interface IClientClient {
     providersGet(request: Client_pb.EmptyMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
     providersGet(request: Client_pb.EmptyMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
     providersGet(request: Client_pb.EmptyMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
-    gestaltsGetNode(request: Client_pb.GestaltMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
-    gestaltsGetNode(request: Client_pb.GestaltMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
-    gestaltsGetNode(request: Client_pb.GestaltMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
+    identitiesGetConnectedInfos(request: Client_pb.ProviderSearchMessage, options?: Partial<grpc.CallOptions>): grpc.ClientReadableStream<Client_pb.IdentityInfoMessage>;
+    identitiesGetConnectedInfos(request: Client_pb.ProviderSearchMessage, metadata?: grpc.Metadata, options?: Partial<grpc.CallOptions>): grpc.ClientReadableStream<Client_pb.IdentityInfoMessage>;
+    identitiesGetInfo(request: Client_pb.ProviderMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
+    identitiesGetInfo(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
+    identitiesGetInfo(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
+    identitiesAugmentKeynode(request: Client_pb.ProviderMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    identitiesAugmentKeynode(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    identitiesAugmentKeynode(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsGetNode(request: Client_pb.NodeMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
+    gestaltsGetNode(request: Client_pb.NodeMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
+    gestaltsGetNode(request: Client_pb.NodeMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
     gestaltsGetIdentity(request: Client_pb.ProviderMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
     gestaltsGetIdentity(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
     gestaltsGetIdentity(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
@@ -610,6 +737,30 @@ export interface IClientClient {
     gestaltsSetIdentity(request: Client_pb.GestaltTrustMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
     gestaltsSetIdentity(request: Client_pb.GestaltTrustMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
     gestaltsSetIdentity(request: Client_pb.GestaltTrustMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsDiscoverNode(request: Client_pb.NodeMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsDiscoverNode(request: Client_pb.NodeMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsDiscoverNode(request: Client_pb.NodeMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsDiscoverIdentity(request: Client_pb.ProviderMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsDiscoverIdentity(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsDiscoverIdentity(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsGetActionsByNode(request: Client_pb.NodeMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.ActionsMessage) => void): grpc.ClientUnaryCall;
+    gestaltsGetActionsByNode(request: Client_pb.NodeMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.ActionsMessage) => void): grpc.ClientUnaryCall;
+    gestaltsGetActionsByNode(request: Client_pb.NodeMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.ActionsMessage) => void): grpc.ClientUnaryCall;
+    gestaltsGetActionsByIdentity(request: Client_pb.ProviderMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.ActionsMessage) => void): grpc.ClientUnaryCall;
+    gestaltsGetActionsByIdentity(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.ActionsMessage) => void): grpc.ClientUnaryCall;
+    gestaltsGetActionsByIdentity(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.ActionsMessage) => void): grpc.ClientUnaryCall;
+    gestaltsSetActionByNode(request: Client_pb.SetActionsMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsSetActionByNode(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsSetActionByNode(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsSetActionByIdentity(request: Client_pb.SetActionsMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsSetActionByIdentity(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsSetActionByIdentity(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsUnsetActionByNode(request: Client_pb.SetActionsMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsUnsetActionByNode(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsUnsetActionByNode(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsUnsetActionByIdentity(request: Client_pb.SetActionsMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsUnsetActionByIdentity(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    gestaltsUnsetActionByIdentity(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
     gestaltSync(): grpc.ClientDuplexStream<Client_pb.GestaltMessage, Client_pb.GestaltMessage>;
     gestaltSync(options: Partial<grpc.CallOptions>): grpc.ClientDuplexStream<Client_pb.GestaltMessage, Client_pb.GestaltMessage>;
     gestaltSync(metadata: grpc.Metadata, options?: Partial<grpc.CallOptions>): grpc.ClientDuplexStream<Client_pb.GestaltMessage, Client_pb.GestaltMessage>;
@@ -707,9 +858,8 @@ export class ClientClient extends grpc.Client implements IClientClient {
     public vaultsShare(request: Client_pb.ShareMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
     public vaultsPermissions(request: Client_pb.ShareMessage, options?: Partial<grpc.CallOptions>): grpc.ClientReadableStream<Client_pb.PermissionMessage>;
     public vaultsPermissions(request: Client_pb.ShareMessage, metadata?: grpc.Metadata, options?: Partial<grpc.CallOptions>): grpc.ClientReadableStream<Client_pb.PermissionMessage>;
-    public identitiesAuthenticate(request: Client_pb.ProviderMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
-    public identitiesAuthenticate(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
-    public identitiesAuthenticate(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
+    public identitiesAuthenticate(request: Client_pb.ProviderMessage, options?: Partial<grpc.CallOptions>): grpc.ClientReadableStream<Client_pb.ProviderMessage>;
+    public identitiesAuthenticate(request: Client_pb.ProviderMessage, metadata?: grpc.Metadata, options?: Partial<grpc.CallOptions>): grpc.ClientReadableStream<Client_pb.ProviderMessage>;
     public tokensPut(request: Client_pb.TokenSpecificMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
     public tokensPut(request: Client_pb.TokenSpecificMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
     public tokensPut(request: Client_pb.TokenSpecificMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
@@ -722,9 +872,17 @@ export class ClientClient extends grpc.Client implements IClientClient {
     public providersGet(request: Client_pb.EmptyMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
     public providersGet(request: Client_pb.EmptyMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
     public providersGet(request: Client_pb.EmptyMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
-    public gestaltsGetNode(request: Client_pb.GestaltMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
-    public gestaltsGetNode(request: Client_pb.GestaltMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
-    public gestaltsGetNode(request: Client_pb.GestaltMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
+    public identitiesGetConnectedInfos(request: Client_pb.ProviderSearchMessage, options?: Partial<grpc.CallOptions>): grpc.ClientReadableStream<Client_pb.IdentityInfoMessage>;
+    public identitiesGetConnectedInfos(request: Client_pb.ProviderSearchMessage, metadata?: grpc.Metadata, options?: Partial<grpc.CallOptions>): grpc.ClientReadableStream<Client_pb.IdentityInfoMessage>;
+    public identitiesGetInfo(request: Client_pb.ProviderMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
+    public identitiesGetInfo(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
+    public identitiesGetInfo(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.ProviderMessage) => void): grpc.ClientUnaryCall;
+    public identitiesAugmentKeynode(request: Client_pb.ProviderMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public identitiesAugmentKeynode(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public identitiesAugmentKeynode(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsGetNode(request: Client_pb.NodeMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsGetNode(request: Client_pb.NodeMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsGetNode(request: Client_pb.NodeMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
     public gestaltsGetIdentity(request: Client_pb.ProviderMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
     public gestaltsGetIdentity(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
     public gestaltsGetIdentity(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.GestaltMessage) => void): grpc.ClientUnaryCall;
@@ -736,6 +894,30 @@ export class ClientClient extends grpc.Client implements IClientClient {
     public gestaltsSetIdentity(request: Client_pb.GestaltTrustMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
     public gestaltsSetIdentity(request: Client_pb.GestaltTrustMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
     public gestaltsSetIdentity(request: Client_pb.GestaltTrustMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsDiscoverNode(request: Client_pb.NodeMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsDiscoverNode(request: Client_pb.NodeMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsDiscoverNode(request: Client_pb.NodeMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsDiscoverIdentity(request: Client_pb.ProviderMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsDiscoverIdentity(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsDiscoverIdentity(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsGetActionsByNode(request: Client_pb.NodeMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.ActionsMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsGetActionsByNode(request: Client_pb.NodeMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.ActionsMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsGetActionsByNode(request: Client_pb.NodeMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.ActionsMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsGetActionsByIdentity(request: Client_pb.ProviderMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.ActionsMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsGetActionsByIdentity(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.ActionsMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsGetActionsByIdentity(request: Client_pb.ProviderMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.ActionsMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsSetActionByNode(request: Client_pb.SetActionsMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsSetActionByNode(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsSetActionByNode(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsSetActionByIdentity(request: Client_pb.SetActionsMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsSetActionByIdentity(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsSetActionByIdentity(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsUnsetActionByNode(request: Client_pb.SetActionsMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsUnsetActionByNode(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsUnsetActionByNode(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsUnsetActionByIdentity(request: Client_pb.SetActionsMessage, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsUnsetActionByIdentity(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
+    public gestaltsUnsetActionByIdentity(request: Client_pb.SetActionsMessage, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: Client_pb.EmptyMessage) => void): grpc.ClientUnaryCall;
     public gestaltSync(options?: Partial<grpc.CallOptions>): grpc.ClientDuplexStream<Client_pb.GestaltMessage, Client_pb.GestaltMessage>;
     public gestaltSync(metadata?: grpc.Metadata, options?: Partial<grpc.CallOptions>): grpc.ClientDuplexStream<Client_pb.GestaltMessage, Client_pb.GestaltMessage>;
 }

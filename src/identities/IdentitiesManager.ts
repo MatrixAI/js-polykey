@@ -12,6 +12,7 @@ import { Mutex } from 'async-mutex';
 import Logger from '@matrixai/logger';
 import * as identitiesErrors from './errors';
 import { errors as dbErrors } from '../db';
+import { GithubProvider } from './providers';
 
 class IdentitiesManager {
   public readonly identitiesPath: string;

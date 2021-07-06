@@ -16,6 +16,7 @@ import { GestaltGraph } from './gestalts';
 import { Sigchain } from './sigchain';
 import { ACL } from './acl';
 import { DB } from './db';
+import Discovery from "./discovery/Discovery";
 import { WorkerManager } from './workers';
 import { SessionManager } from './session';
 import { certNodeId } from './network/utils';
@@ -39,6 +40,7 @@ class Polykey {
   public readonly sigchain: Sigchain;
   public readonly acl: ACL;
   public readonly db: DB;
+  public readonly discovery: Discovery;
 
   // GRPC
   public readonly grpcServer: GRPCServer;
@@ -76,6 +78,7 @@ class Polykey {
     authToken,
     fs,
     logger,
+    discovery,
   }: {
     nodePath?: string;
     keyManager?: KeyManager;
@@ -96,6 +99,7 @@ class Polykey {
     authToken?: string;
     fs?: FileSystem;
     logger?: Logger;
+    discovery?: Discovery;
   } = {}) {
     this.grpcHost = grpcHost ?? '127.0.0.1';
     this.grpcPort = grpcPort ?? 0;
@@ -185,6 +189,13 @@ class Polykey {
         db: this.db,
         logger: this.logger.getChild('IdentitiesManager'),
       });
+    this.discovery= discovery??
+      new Discovery({
+        gestaltGraph: this.gestalts,
+        identitiesManager: this.identities,
+        nodeManager: this.nodes,
+        logger: this.logger.getChild('Discovery'),
+      })
     this.workers =
       workerManager ??
       new WorkerManager({
@@ -296,18 +307,20 @@ class Polykey {
       bits: rootKeyPairBits,
     });
 
+
     await this.acl.start({ fresh });
 
     await this.sigchain.start({ fresh });
     await this.nodes.start({ nodeId, fresh });
     await this.vaults.start({ fresh });
-    // await this.gestalts.start({ fresh });
+    await this.gestalts.start({ fresh });
     await this.identities.start({ fresh });
 
     const keyPrivatePem = this.keys.getRootKeyPairPem().privateKey;
     const certChainPem = await this.keys.getRootCertChainPem();
 
     await this.gitManager.start();
+    await this.discovery.start();
 
     // GRPC Server
     await this.grpcServer.start({
@@ -365,10 +378,11 @@ class Polykey {
 
     await this.revProxy.stop();
 
+    await this.discovery.stop();
     await this.gitManager.stop();
 
     await this.identities.stop();
-    // await this.gestalts.stop();
+    await this.gestalts.stop();
 
     await this.vaults.stop();
     await this.nodes.stop();

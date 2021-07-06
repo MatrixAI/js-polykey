@@ -509,6 +509,66 @@ export namespace TokenMessage {
     }
 }
 
+export class ProviderSearchMessage extends jspb.Message { 
+
+    hasProvider(): boolean;
+    clearProvider(): void;
+    getProvider(): ProviderMessage | undefined;
+    setProvider(value?: ProviderMessage): ProviderSearchMessage;
+    clearSearchTermList(): void;
+    getSearchTermList(): Array<string>;
+    setSearchTermList(value: Array<string>): ProviderSearchMessage;
+    addSearchTerm(value: string, index?: number): string;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): ProviderSearchMessage.AsObject;
+    static toObject(includeInstance: boolean, msg: ProviderSearchMessage): ProviderSearchMessage.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: ProviderSearchMessage, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): ProviderSearchMessage;
+    static deserializeBinaryFromReader(message: ProviderSearchMessage, reader: jspb.BinaryReader): ProviderSearchMessage;
+}
+
+export namespace ProviderSearchMessage {
+    export type AsObject = {
+        provider?: ProviderMessage.AsObject,
+        searchTermList: Array<string>,
+    }
+}
+
+export class IdentityInfoMessage extends jspb.Message { 
+
+    hasProvider(): boolean;
+    clearProvider(): void;
+    getProvider(): ProviderMessage | undefined;
+    setProvider(value?: ProviderMessage): IdentityInfoMessage;
+    getName(): string;
+    setName(value: string): IdentityInfoMessage;
+    getEmail(): string;
+    setEmail(value: string): IdentityInfoMessage;
+    getUrl(): string;
+    setUrl(value: string): IdentityInfoMessage;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): IdentityInfoMessage.AsObject;
+    static toObject(includeInstance: boolean, msg: IdentityInfoMessage): IdentityInfoMessage.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: IdentityInfoMessage, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): IdentityInfoMessage;
+    static deserializeBinaryFromReader(message: IdentityInfoMessage, reader: jspb.BinaryReader): IdentityInfoMessage;
+}
+
+export namespace IdentityInfoMessage {
+    export type AsObject = {
+        provider?: ProviderMessage.AsObject,
+        name: string,
+        email: string,
+        url: string,
+    }
+}
+
 export class GestaltMessage extends jspb.Message { 
     getName(): string;
     setName(value: string): GestaltMessage;
@@ -553,4 +613,67 @@ export namespace GestaltTrustMessage {
         name: string,
         set: boolean,
     }
+}
+
+export class ActionsMessage extends jspb.Message { 
+    clearActionList(): void;
+    getActionList(): Array<string>;
+    setActionList(value: Array<string>): ActionsMessage;
+    addAction(value: string, index?: number): string;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): ActionsMessage.AsObject;
+    static toObject(includeInstance: boolean, msg: ActionsMessage): ActionsMessage.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: ActionsMessage, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): ActionsMessage;
+    static deserializeBinaryFromReader(message: ActionsMessage, reader: jspb.BinaryReader): ActionsMessage;
+}
+
+export namespace ActionsMessage {
+    export type AsObject = {
+        actionList: Array<string>,
+    }
+}
+
+export class SetActionsMessage extends jspb.Message { 
+
+    hasNode(): boolean;
+    clearNode(): void;
+    getNode(): NodeMessage | undefined;
+    setNode(value?: NodeMessage): SetActionsMessage;
+
+    hasIdentity(): boolean;
+    clearIdentity(): void;
+    getIdentity(): ProviderMessage | undefined;
+    setIdentity(value?: ProviderMessage): SetActionsMessage;
+    getAction(): string;
+    setAction(value: string): SetActionsMessage;
+
+    getNodeOrProviderCase(): SetActionsMessage.NodeOrProviderCase;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): SetActionsMessage.AsObject;
+    static toObject(includeInstance: boolean, msg: SetActionsMessage): SetActionsMessage.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: SetActionsMessage, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): SetActionsMessage;
+    static deserializeBinaryFromReader(message: SetActionsMessage, reader: jspb.BinaryReader): SetActionsMessage;
+}
+
+export namespace SetActionsMessage {
+    export type AsObject = {
+        node?: NodeMessage.AsObject,
+        identity?: ProviderMessage.AsObject,
+        action: string,
+    }
+
+    export enum NodeOrProviderCase {
+        NODE_OR_PROVIDER_NOT_SET = 0,
+        NODE = 1,
+        IDENTITY = 2,
+    }
+
 }

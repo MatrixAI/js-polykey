@@ -1,6 +1,7 @@
 import path from 'path';
 import { exec, ExecException } from 'child_process';
 import main from '../../src/bin/polykey';
+import * as mockedProcess from 'jest-mock-process';
 
 type CliRes = {
   code: number;
@@ -35,8 +36,37 @@ function cli(args: Array<string>, cwd: string): Promise<CliRes> {
   });
 }
 
-function pk(args: Array<string>): Promise<any> {
+async function pk(args: Array<string>): Promise<any> {
   return main(['', '', ...args]);
 }
 
-export { cli, pk };
+type PkResult = {
+  code: number;
+  stdout: string;
+  stderr: string;
+  consoleLog: string;
+};
+
+async function pkWithStdio(args: Array<string>): Promise<PkResult> {
+  const mockedStdout = mockedProcess.mockProcessStdout();
+  const mockedStderr = mockedProcess.mockProcessStderr();
+  const mockedConsoleLog = mockedProcess.mockConsoleLog();
+
+  //Running the command.
+  const code = await pk(args);
+
+  const stdoutLog = mockedStdout.mock.calls;
+  const stderrLog = mockedStderr.mock.calls;
+  const consoleLog = mockedConsoleLog.mock.calls;
+  mockedStdout.mockRestore();
+  mockedStderr.mockRestore();
+  mockedConsoleLog.mockRestore();
+  return {
+    code: code,
+    stdout: stdoutLog.flat().join(),
+    stderr: stderrLog.flat().join(),
+    consoleLog: consoleLog.flat().join(),
+  };
+}
+
+export { cli, pk, pkWithStdio, PkResult };

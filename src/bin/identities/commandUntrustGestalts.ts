@@ -3,27 +3,26 @@ import Logger, { LogLevel, StreamHandler } from '@matrixai/logger';
 import { clientPB } from '../../client';
 import PolykeyClient from '../../PolykeyClient';
 import { createCommand, outputFormatter } from '../utils';
+import { parseId } from './utils';
 import * as utils from '../../utils';
 
-const commandGetGestalts = createCommand('get', {
+const commandTrustGestalts = createCommand('untrust', {
   description: {
-    description:
-      'Gets a gestalt with a node id or identity from the gestalt graph',
+    description: 'untrusts a node id or identity',
     args: {
-      Id: 'NodeId or identityId to search for in gestalt graph',
-      providerId: 'Provider Id to search for in gestalt graph (provider:id)',
+      id: 'nodeId or "providerId:identityId"',
     },
   },
   nodePath: true,
   verbose: true,
   format: true,
 });
-commandGetGestalts.arguments('<id>');
-commandGetGestalts.option(
-  '-i, --identity <providerId>',
-  'Flags using an identity, sets providerId',
-);
-commandGetGestalts.action(async (id, options) => {
+
+commandTrustGestalts.arguments('<id>');
+commandTrustGestalts.action(async (id, options) => {
+  //parsing ID.
+  const { providerId, identityId, nodeId } = parseId(id);
+
   const clientConfig = {};
   clientConfig['logger'] = new Logger('CLI Logger', LogLevel.WARN, [
     new StreamHandler(),
@@ -31,58 +30,43 @@ commandGetGestalts.action(async (id, options) => {
   if (options.verbose) {
     clientConfig['logger'].setLevel(LogLevel.DEBUG);
   }
+
   clientConfig['nodePath'] = options.nodePath
     ? options.nodePath
     : utils.getDefaultNodePath();
 
   const client = new PolykeyClient(clientConfig);
-
+  const action = 'notify';
   try {
     await client.start({});
     const grpcClient = client.grpcClient;
-
-    let res: clientPB.GestaltMessage;
-
-    if (!options.identity) {
-      //getting from node.
+    const setActionMessage = new clientPB.SetActionsMessage();
+    setActionMessage.setAction(action);
+    if (nodeId) {
+      // Setting by Node.
       const nodeMessage = new clientPB.NodeMessage();
-      nodeMessage.setName(id);
-      res = await grpcClient.gestaltsGetNode(
-        nodeMessage,
+      nodeMessage.setName(nodeId);
+      setActionMessage.setNode(nodeMessage);
+      await grpcClient.gestaltsUnsetActionByNode(
+        setActionMessage,
         await client.session.createJWTCallCredentials(),
       );
     } else {
-      //Getting from identity.
+      //  Setting by Identity
       const providerMessage = new clientPB.ProviderMessage();
-      providerMessage.setId(options.identity);
-      providerMessage.setMessage(id);
-      res = await grpcClient.gestaltsGetIdentitiy(
-        providerMessage,
+      providerMessage.setId(providerId!);
+      providerMessage.setMessage(identityId!);
+      setActionMessage.setIdentity(providerMessage);
+      await grpcClient.gestaltsUnsetActionByIdentity(
+        setActionMessage,
         await client.session.createJWTCallCredentials(),
       );
-    }
-    const gestalt = JSON.parse(res.getName());
-    let output: any = gestalt;
-
-    if (options.format !== 'json') {
-      //Creating a list.
-      output = [];
-      //Listing nodes.
-      for (const nodeKey of Object.keys(gestalt.nodes)) {
-        const node = gestalt.nodes[nodeKey];
-        output.push(`${node.id}`);
-      }
-      //Listing identities
-      for (const identityKey of Object.keys(gestalt.identities)) {
-        const identitiy = gestalt.identities[identityKey];
-        output.push(`${identitiy.providerId}:${identitiy.identityId}`);
-      }
     }
 
     process.stdout.write(
       outputFormatter({
         type: options.format === 'json' ? 'json' : 'list',
-        data: output,
+        data: [`untrusting: ${id}`],
       }),
     );
   } catch (err) {
@@ -105,4 +89,4 @@ commandGetGestalts.action(async (id, options) => {
   }
 });
 
-export default commandGetGestalts;
+export default commandTrustGestalts;

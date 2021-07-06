@@ -64,7 +64,7 @@ describe('Bootstrap', () => {
       await pk.start({ password: 'password' });
       await pk.stop();
       expect(await checkKeynodeState(nodePath)).toBe('KEYNODE_EXISTS');
-    });
+    }, 20000);
   });
 
   describe('BootstrapPolykeyState', () => {

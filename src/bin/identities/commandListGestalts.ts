@@ -3,6 +3,7 @@ import Logger, { LogLevel, StreamHandler } from '@matrixai/logger';
 import { clientPB } from '../../client';
 import PolykeyClient from '../../PolykeyClient';
 import { createCommand, outputFormatter } from '../utils';
+import * as utils from '../../utils';
 
 const commandListGestalts = createCommand('list', {
   description: {
@@ -22,28 +23,80 @@ commandListGestalts.action(async (options) => {
   if (options.verbose) {
     clientConfig['logger'].setLevel(LogLevel.DEBUG);
   }
-  if (options.nodePath) {
-    clientConfig['nodePath'] = options.nodePath;
-  }
+  clientConfig['nodePath'] = options.nodePath
+    ? options.nodePath
+    : utils.getDefaultNodePath();
 
   const client = new PolykeyClient(clientConfig);
   const emptyMessage = new clientPB.EmptyMessage();
-
+  let output: any;
+  const gestalts: any = [];
   try {
     await client.start({});
     const grpcClient = client.grpcClient;
 
-    const res = grpcClient.gestaltsList(emptyMessage);
+    const res = grpcClient.gestaltsList(
+      emptyMessage,
+      await client.session.createJWTCallCredentials(),
+    );
 
-    const gestalts: Array<string> = [];
     for await (const val of res) {
-      gestalts.push(`Gestalt:\t\t${val.getName()}`);
+      const gestalt = JSON.parse(val.getName());
+      const newGestalt: any = {
+        permissions: [],
+        nodes: [],
+        identities: [],
+      };
+      for (const node of Object.keys(gestalt.nodes)) {
+        const nodeInfo = gestalt.nodes[node];
+        newGestalt.nodes.push({ id: nodeInfo.id });
+      }
+      for (const identity of Object.keys(gestalt.identities)) {
+        const identityInfo = gestalt.identities[identity];
+        newGestalt.identities.push({
+          providerId: identityInfo.providerId,
+          identityId: identityInfo.identityId,
+        });
+      }
+      //Getting the permissions for the gestalt.
+      const nodeMessage = new clientPB.NodeMessage();
+      nodeMessage.setName(newGestalt.nodes[0].id);
+      const actionsMessage = await grpcClient.gestaltsGetActionsByNode(
+        nodeMessage,
+        await client.session.createJWTCallCredentials(),
+      );
+      const actionList = actionsMessage.getActionList();
+      if (actionList.length === 0) newGestalt.permissions = null;
+      else newGestalt.permissions = actionList;
+      gestalts.push(newGestalt);
+    }
+    output = gestalts;
+    console.log('format: ', options.format);
+    if (options.format !== 'json') {
+      //Convert to a human readable list.
+      output = [];
+      let count = 1;
+      for (const gestalt of gestalts) {
+        output.push(`gestalt ${count}`);
+        output.push(`permissions: ${gestalt.permissions ?? 'None'}`);
+
+        //listing nodes
+        for (const node of gestalt.nodes) {
+          output.push(`${node.id}`);
+        }
+        //listing identities
+        for (const identity of gestalt.identities) {
+          output.push(`${identity.providerId}:${identity.identityId}`);
+        }
+        output.push('');
+        count++;
+      }
     }
 
     process.stdout.write(
       outputFormatter({
         type: options.format === 'json' ? 'json' : 'list',
-        data: gestalts,
+        data: output,
       }),
     );
   } catch (err) {
@@ -60,8 +113,9 @@ commandListGestalts.action(async (options) => {
         }),
       );
     }
+    throw err;
   } finally {
-    client.stop();
+    await client.stop();
   }
 });
 

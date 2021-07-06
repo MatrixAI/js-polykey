@@ -276,6 +276,22 @@ class GRPCClientClient extends GRPCClient<ClientClient> {
     )(...args);
   }
 
+  public gestaltsSetNode(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.EmptyMessage>(
+      this.client,
+      this.client.gestaltsSetNode,
+    )(...args);
+  }
+
+  public gestaltsSetIdentity(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.EmptyMessage>(
+      this.client,
+      this.client.gestaltsSetIdentity,
+    )(...args);
+  }
+
   public gestaltsGetIdentitiy(...args) {
     if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
     return grpcUtils.promisifyUnaryCall<clientPB.GestaltMessage>(
@@ -289,6 +305,70 @@ class GRPCClientClient extends GRPCClient<ClientClient> {
     return grpcUtils.promisifyUnaryCall<clientPB.GestaltMessage>(
       this.client,
       this.client.gestaltsGetNode,
+    )(...args);
+  }
+
+  public gestaltsDiscoverNode(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.GestaltMessage>(
+      this.client,
+      this.client.gestaltsDiscoverNode,
+    )(...args);
+  }
+
+  public gestaltsDiscoverIdentity(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.GestaltMessage>(
+      this.client,
+      this.client.gestaltsDiscoverIdentity,
+    )(...args);
+  }
+
+  public gestaltsGetActionsByNode(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.ActionsMessage>(
+      this.client,
+      this.client.gestaltsGetActionsByNode,
+    )(...args);
+  }
+
+  public gestaltsGetActionsByIdentity(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.ActionsMessage>(
+      this.client,
+      this.client.gestaltsGetActionsByIdentity,
+    )(...args);
+  }
+
+  public gestaltsSetActionByNode(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.EmptyMessage>(
+      this.client,
+      this.client.gestaltsSetActionByNode,
+    )(...args);
+  }
+
+  public gestaltsSetActionByIdentity(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.EmptyMessage>(
+      this.client,
+      this.client.gestaltsSetActionByIdentity,
+    )(...args);
+  }
+
+  public gestaltsUnsetActionByNode(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.EmptyMessage>(
+      this.client,
+      this.client.gestaltsUnsetActionByNode,
+    )(...args);
+  }
+
+  public gestaltsUnsetActionByIdentity(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.EmptyMessage>(
+      this.client,
+      this.client.gestaltsUnsetActionByIdentity,
     )(...args);
   }
 
@@ -321,6 +401,38 @@ class GRPCClientClient extends GRPCClient<ClientClient> {
     return grpcUtils.promisifyUnaryCall<clientPB.ProviderMessage>(
       this.client,
       this.client.providersGet,
+    )(...args);
+  }
+
+  public identitiesAuthenticate(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyReadableStreamCall<clientPB.ProviderMessage>(
+      this.client,
+      this.client.identitiesAuthenticate,
+    )(...args);
+  }
+
+  public identitiesGetConnectedInfos(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.ProviderSearchMessage>(
+      this.client,
+      this.client.identitiesGetConnectedInfos,
+    )(...args);
+  }
+
+  public identitiesGetInfo(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.ProviderMessage>(
+      this.client,
+      this.client.identitiesGetInfo,
+    )(...args);
+  }
+
+  public identitiesAugmentKeynode(...args) {
+    if (!this._started) throw new clientErrors.ErrorClientClientNotStarted();
+    return grpcUtils.promisifyUnaryCall<clientPB.EmptyMessage>(
+      this.client,
+      this.client.identitiesAugmentKeynode,
     )(...args);
   }
 }

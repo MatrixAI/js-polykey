@@ -39,9 +39,15 @@ function createClientService({ polykeyAgent }: { polykeyAgent: PolykeyAgent }) {
     }),
     ...createIdentitiesRPC({
       identitiesManager: polykeyAgent.identities,
+      gestaltGraph: polykeyAgent.gestalts,
+      nodeManager: polykeyAgent.nodes,
+      sessionManager: polykeyAgent.sessions,
     }),
     ...createGestaltRPC({
       gestaltGraph: polykeyAgent.gestalts,
+      nodeManager: polykeyAgent.nodes,
+      sessionManager: polykeyAgent.sessions,
+      discovery: polykeyAgent.discovery,
     }),
     nodesList: async (
       call: grpc.ServerWritableStream<

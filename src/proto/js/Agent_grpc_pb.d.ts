@@ -5,7 +5,6 @@
 /* eslint-disable */
 
 import * as grpc from "@grpc/grpc-js";
-import {handleClientStreamingCall} from "@grpc/grpc-js/build/src/server-call";
 import * as Agent_pb from "./Agent_pb";
 
 interface IAgentService extends grpc.ServiceDefinition<grpc.UntypedServiceImplementation> {

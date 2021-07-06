@@ -8,9 +8,12 @@ class ErrorGestaltsGraphNodeIdMissing extends ErrorGestalts {}
 
 class ErrorGestaltsGraphIdentityIdMissing extends ErrorGestalts {}
 
+class ErrorGestaltsInvalidAction extends ErrorGestalts {}
+
 export {
   ErrorGestalts,
   ErrorGestaltsGraphNotStarted,
   ErrorGestaltsGraphNodeIdMissing,
   ErrorGestaltsGraphIdentityIdMissing,
+  ErrorGestaltsInvalidAction,
 };

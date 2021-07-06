@@ -7,22 +7,21 @@ import * as binUtils from '../utils';
 import * as grpcErrors from '../../grpc/errors';
 
 const commandVaultPermissions = binUtils.createCommand('permissions', {
-  description: 'Sets the permissions of a vault for Node Ids',
+  description: {
+    description: 'Sets the permissions of a vault for Node Ids',
+    args: {
+      vaultName: 'Name or ID of the vault',
+      nodeId: '(optional) nodeId to check permission on',
+    },
+  },
   aliases: ['perms'],
   nodePath: true,
   verbose: true,
   format: true,
   passwordFile: true,
 });
-commandVaultPermissions.requiredOption(
-  '-vn, --vault-name <vaultName>',
-  '(required) Name of the vault to set permissions from',
-);
-commandVaultPermissions.option(
-  '-ni, --node-id <nodeId>',
-  'The node Id to check the permissions of',
-);
-commandVaultPermissions.action(async (options) => {
+commandVaultPermissions.arguments('<vaultName> [nodeId]');
+commandVaultPermissions.action(async (vaultName, nodeId, options) => {
   const meta = new grpc.Metadata();
 
   const clientConfig = {};
@@ -41,8 +40,8 @@ commandVaultPermissions.action(async (options) => {
 
   const client = new PolykeyClient(clientConfig);
   const shareMessage = new clientPB.ShareMessage();
-  shareMessage.setName(options.vaultName);
-  shareMessage.setId(options.nodeId);
+  shareMessage.setName(vaultName);
+  shareMessage.setId(nodeId);
 
   try {
     await client.start({});
@@ -77,8 +76,8 @@ commandVaultPermissions.action(async (options) => {
           message: err.message,
         }),
       );
-      throw err;
     }
+    throw err;
   } finally {
     await client.stop();
     options.passwordFile = undefined;

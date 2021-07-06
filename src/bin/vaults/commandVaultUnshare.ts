@@ -6,7 +6,7 @@ import * as utils from '../../utils';
 import * as binUtils from '../utils';
 import * as grpcErrors from '../../grpc/errors';
 
-const commandVaultShare = binUtils.createCommand('share', {
+const commandVaultShare = binUtils.createCommand('unshare', {
   description: {
     description: 'Sets the permissions of a vault for Node Ids',
     args: {
@@ -44,7 +44,7 @@ commandVaultShare.action(async (vaultName, nodesList, options) => {
   const shareMessage = new clientPB.ShareMessage();
   shareMessage.setName(vaultName);
   shareMessage.setId(JSON.stringify(nodesList));
-  shareMessage.setSet(false);
+  shareMessage.setSet(true);
 
   try {
     await client.start({});

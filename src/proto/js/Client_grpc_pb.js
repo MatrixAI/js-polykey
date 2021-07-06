@@ -4,6 +4,17 @@
 var grpc = require('@grpc/grpc-js');
 var Client_pb = require('./Client_pb.js');
 
+function serialize_clientInterface_ActionsMessage(arg) {
+  if (!(arg instanceof Client_pb.ActionsMessage)) {
+    throw new Error('Expected argument of type clientInterface.ActionsMessage');
+  }
+  return Buffer.from(arg.serializeBinary());
+}
+
+function deserialize_clientInterface_ActionsMessage(buffer_arg) {
+  return Client_pb.ActionsMessage.deserializeBinary(new Uint8Array(buffer_arg));
+}
+
 function serialize_clientInterface_CertificateMessage(arg) {
   if (!(arg instanceof Client_pb.CertificateMessage)) {
     throw new Error('Expected argument of type clientInterface.CertificateMessage');
@@ -68,6 +79,17 @@ function serialize_clientInterface_GestaltTrustMessage(arg) {
 
 function deserialize_clientInterface_GestaltTrustMessage(buffer_arg) {
   return Client_pb.GestaltTrustMessage.deserializeBinary(new Uint8Array(buffer_arg));
+}
+
+function serialize_clientInterface_IdentityInfoMessage(arg) {
+  if (!(arg instanceof Client_pb.IdentityInfoMessage)) {
+    throw new Error('Expected argument of type clientInterface.IdentityInfoMessage');
+  }
+  return Buffer.from(arg.serializeBinary());
+}
+
+function deserialize_clientInterface_IdentityInfoMessage(buffer_arg) {
+  return Client_pb.IdentityInfoMessage.deserializeBinary(new Uint8Array(buffer_arg));
 }
 
 function serialize_clientInterface_JWTTokenMessage(arg) {
@@ -147,6 +169,17 @@ function deserialize_clientInterface_ProviderMessage(buffer_arg) {
   return Client_pb.ProviderMessage.deserializeBinary(new Uint8Array(buffer_arg));
 }
 
+function serialize_clientInterface_ProviderSearchMessage(arg) {
+  if (!(arg instanceof Client_pb.ProviderSearchMessage)) {
+    throw new Error('Expected argument of type clientInterface.ProviderSearchMessage');
+  }
+  return Buffer.from(arg.serializeBinary());
+}
+
+function deserialize_clientInterface_ProviderSearchMessage(buffer_arg) {
+  return Client_pb.ProviderSearchMessage.deserializeBinary(new Uint8Array(buffer_arg));
+}
+
 function serialize_clientInterface_SecretMessage(arg) {
   if (!(arg instanceof Client_pb.SecretMessage)) {
     throw new Error('Expected argument of type clientInterface.SecretMessage');
@@ -189,6 +222,17 @@ function serialize_clientInterface_SecretSpecificMessage(arg) {
 
 function deserialize_clientInterface_SecretSpecificMessage(buffer_arg) {
   return Client_pb.SecretSpecificMessage.deserializeBinary(new Uint8Array(buffer_arg));
+}
+
+function serialize_clientInterface_SetActionsMessage(arg) {
+  if (!(arg instanceof Client_pb.SetActionsMessage)) {
+    throw new Error('Expected argument of type clientInterface.SetActionsMessage');
+  }
+  return Buffer.from(arg.serializeBinary());
+}
+
+function deserialize_clientInterface_SetActionsMessage(buffer_arg) {
+  return Client_pb.SetActionsMessage.deserializeBinary(new Uint8Array(buffer_arg));
 }
 
 function serialize_clientInterface_ShareMessage(arg) {
@@ -631,7 +675,7 @@ vaultsList: {
 identitiesAuthenticate: {
     path: '/clientInterface.Client/IdentitiesAuthenticate',
     requestStream: false,
-    responseStream: false,
+    responseStream: true,
     requestType: Client_pb.ProviderMessage,
     responseType: Client_pb.ProviderMessage,
     requestSerialize: serialize_clientInterface_ProviderMessage,
@@ -683,15 +727,48 @@ identitiesAuthenticate: {
     responseSerialize: serialize_clientInterface_ProviderMessage,
     responseDeserialize: deserialize_clientInterface_ProviderMessage,
   },
+  identitiesGetConnectedInfos: {
+    path: '/clientInterface.Client/IdentitiesGetConnectedInfos',
+    requestStream: false,
+    responseStream: true,
+    requestType: Client_pb.ProviderSearchMessage,
+    responseType: Client_pb.IdentityInfoMessage,
+    requestSerialize: serialize_clientInterface_ProviderSearchMessage,
+    requestDeserialize: deserialize_clientInterface_ProviderSearchMessage,
+    responseSerialize: serialize_clientInterface_IdentityInfoMessage,
+    responseDeserialize: deserialize_clientInterface_IdentityInfoMessage,
+  },
+  identitiesGetInfo: {
+    path: '/clientInterface.Client/IdentitiesGetInfo',
+    requestStream: false,
+    responseStream: false,
+    requestType: Client_pb.ProviderMessage,
+    responseType: Client_pb.ProviderMessage,
+    requestSerialize: serialize_clientInterface_ProviderMessage,
+    requestDeserialize: deserialize_clientInterface_ProviderMessage,
+    responseSerialize: serialize_clientInterface_ProviderMessage,
+    responseDeserialize: deserialize_clientInterface_ProviderMessage,
+  },
+  identitiesAugmentKeynode: {
+    path: '/clientInterface.Client/IdentitiesAugmentKeynode',
+    requestStream: false,
+    responseStream: false,
+    requestType: Client_pb.ProviderMessage,
+    responseType: Client_pb.EmptyMessage,
+    requestSerialize: serialize_clientInterface_ProviderMessage,
+    requestDeserialize: deserialize_clientInterface_ProviderMessage,
+    responseSerialize: serialize_clientInterface_EmptyMessage,
+    responseDeserialize: deserialize_clientInterface_EmptyMessage,
+  },
   // Gestalts
 gestaltsGetNode: {
     path: '/clientInterface.Client/GestaltsGetNode',
     requestStream: false,
     responseStream: false,
-    requestType: Client_pb.GestaltMessage,
+    requestType: Client_pb.NodeMessage,
     responseType: Client_pb.GestaltMessage,
-    requestSerialize: serialize_clientInterface_GestaltMessage,
-    requestDeserialize: deserialize_clientInterface_GestaltMessage,
+    requestSerialize: serialize_clientInterface_NodeMessage,
+    requestDeserialize: deserialize_clientInterface_NodeMessage,
     responseSerialize: serialize_clientInterface_GestaltMessage,
     responseDeserialize: deserialize_clientInterface_GestaltMessage,
   },
@@ -736,6 +813,94 @@ gestaltsGetNode: {
     responseType: Client_pb.EmptyMessage,
     requestSerialize: serialize_clientInterface_GestaltTrustMessage,
     requestDeserialize: deserialize_clientInterface_GestaltTrustMessage,
+    responseSerialize: serialize_clientInterface_EmptyMessage,
+    responseDeserialize: deserialize_clientInterface_EmptyMessage,
+  },
+  gestaltsDiscoverNode: {
+    path: '/clientInterface.Client/GestaltsDiscoverNode',
+    requestStream: false,
+    responseStream: false,
+    requestType: Client_pb.NodeMessage,
+    responseType: Client_pb.EmptyMessage,
+    requestSerialize: serialize_clientInterface_NodeMessage,
+    requestDeserialize: deserialize_clientInterface_NodeMessage,
+    responseSerialize: serialize_clientInterface_EmptyMessage,
+    responseDeserialize: deserialize_clientInterface_EmptyMessage,
+  },
+  gestaltsDiscoverIdentity: {
+    path: '/clientInterface.Client/GestaltsDiscoverIdentity',
+    requestStream: false,
+    responseStream: false,
+    requestType: Client_pb.ProviderMessage,
+    responseType: Client_pb.EmptyMessage,
+    requestSerialize: serialize_clientInterface_ProviderMessage,
+    requestDeserialize: deserialize_clientInterface_ProviderMessage,
+    responseSerialize: serialize_clientInterface_EmptyMessage,
+    responseDeserialize: deserialize_clientInterface_EmptyMessage,
+  },
+  gestaltsGetActionsByNode: {
+    path: '/clientInterface.Client/GestaltsGetActionsByNode',
+    requestStream: false,
+    responseStream: false,
+    requestType: Client_pb.NodeMessage,
+    responseType: Client_pb.ActionsMessage,
+    requestSerialize: serialize_clientInterface_NodeMessage,
+    requestDeserialize: deserialize_clientInterface_NodeMessage,
+    responseSerialize: serialize_clientInterface_ActionsMessage,
+    responseDeserialize: deserialize_clientInterface_ActionsMessage,
+  },
+  gestaltsGetActionsByIdentity: {
+    path: '/clientInterface.Client/GestaltsGetActionsByIdentity',
+    requestStream: false,
+    responseStream: false,
+    requestType: Client_pb.ProviderMessage,
+    responseType: Client_pb.ActionsMessage,
+    requestSerialize: serialize_clientInterface_ProviderMessage,
+    requestDeserialize: deserialize_clientInterface_ProviderMessage,
+    responseSerialize: serialize_clientInterface_ActionsMessage,
+    responseDeserialize: deserialize_clientInterface_ActionsMessage,
+  },
+  gestaltsSetActionByNode: {
+    path: '/clientInterface.Client/GestaltsSetActionByNode',
+    requestStream: false,
+    responseStream: false,
+    requestType: Client_pb.SetActionsMessage,
+    responseType: Client_pb.EmptyMessage,
+    requestSerialize: serialize_clientInterface_SetActionsMessage,
+    requestDeserialize: deserialize_clientInterface_SetActionsMessage,
+    responseSerialize: serialize_clientInterface_EmptyMessage,
+    responseDeserialize: deserialize_clientInterface_EmptyMessage,
+  },
+  gestaltsSetActionByIdentity: {
+    path: '/clientInterface.Client/GestaltsSetActionByIdentity',
+    requestStream: false,
+    responseStream: false,
+    requestType: Client_pb.SetActionsMessage,
+    responseType: Client_pb.EmptyMessage,
+    requestSerialize: serialize_clientInterface_SetActionsMessage,
+    requestDeserialize: deserialize_clientInterface_SetActionsMessage,
+    responseSerialize: serialize_clientInterface_EmptyMessage,
+    responseDeserialize: deserialize_clientInterface_EmptyMessage,
+  },
+  gestaltsUnsetActionByNode: {
+    path: '/clientInterface.Client/GestaltsUnsetActionByNode',
+    requestStream: false,
+    responseStream: false,
+    requestType: Client_pb.SetActionsMessage,
+    responseType: Client_pb.EmptyMessage,
+    requestSerialize: serialize_clientInterface_SetActionsMessage,
+    requestDeserialize: deserialize_clientInterface_SetActionsMessage,
+    responseSerialize: serialize_clientInterface_EmptyMessage,
+    responseDeserialize: deserialize_clientInterface_EmptyMessage,
+  },
+  gestaltsUnsetActionByIdentity: {
+    path: '/clientInterface.Client/GestaltsUnsetActionByIdentity',
+    requestStream: false,
+    responseStream: false,
+    requestType: Client_pb.SetActionsMessage,
+    responseType: Client_pb.EmptyMessage,
+    requestSerialize: serialize_clientInterface_SetActionsMessage,
+    requestDeserialize: deserialize_clientInterface_SetActionsMessage,
     responseSerialize: serialize_clientInterface_EmptyMessage,
     responseDeserialize: deserialize_clientInterface_EmptyMessage,
   },

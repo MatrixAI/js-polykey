@@ -3,27 +3,29 @@ import Logger, { LogLevel, StreamHandler } from '@matrixai/logger';
 import { clientPB } from '../../client';
 import PolykeyClient from '../../PolykeyClient';
 import { createCommand, outputFormatter } from '../utils';
+import { parseId } from './utils';
 import * as utils from '../../utils';
 
-const commandGetGestalts = createCommand('get', {
+const commandAllowGestalts = createCommand('allow', {
   description: {
     description:
       'Gets a gestalt with a node id or identity from the gestalt graph',
     args: {
-      Id: 'NodeId or identityId to search for in gestalt graph',
-      providerId: 'Provider Id to search for in gestalt graph (provider:id)',
+      delete: 'Flag to untrust the node/identity',
+      id: 'nodeId or "providerId:identityId"',
+      permissions: 'Permission to set',
     },
   },
   nodePath: true,
   verbose: true,
   format: true,
 });
-commandGetGestalts.arguments('<id>');
-commandGetGestalts.option(
-  '-i, --identity <providerId>',
-  'Flags using an identity, sets providerId',
-);
-commandGetGestalts.action(async (id, options) => {
+
+commandAllowGestalts.arguments('<id> <permissions>');
+commandAllowGestalts.action(async (id, permissions, options) => {
+  //parsing ID.
+  const { providerId, identityId, nodeId } = parseId(id);
+
   const clientConfig = {};
   clientConfig['logger'] = new Logger('CLI Logger', LogLevel.WARN, [
     new StreamHandler(),
@@ -36,53 +38,44 @@ commandGetGestalts.action(async (id, options) => {
     : utils.getDefaultNodePath();
 
   const client = new PolykeyClient(clientConfig);
+  const gestaltTrustMessage = new clientPB.GestaltTrustMessage();
+  gestaltTrustMessage.setSet(options.trust);
 
   try {
     await client.start({});
     const grpcClient = client.grpcClient;
-
-    let res: clientPB.GestaltMessage;
-
-    if (!options.identity) {
-      //getting from node.
+    const setActionMessage = new clientPB.SetActionsMessage();
+    setActionMessage.setAction(permissions);
+    let name: string;
+    if (nodeId) {
+      // Setting by Node.
       const nodeMessage = new clientPB.NodeMessage();
-      nodeMessage.setName(id);
-      res = await grpcClient.gestaltsGetNode(
-        nodeMessage,
+      nodeMessage.setName(nodeId);
+      setActionMessage.setNode(nodeMessage);
+      name = `${nodeId}`;
+      //Trusting
+      await grpcClient.gestaltsSetActionByNode(
+        setActionMessage,
         await client.session.createJWTCallCredentials(),
       );
     } else {
-      //Getting from identity.
+      //  Setting by Identity
       const providerMessage = new clientPB.ProviderMessage();
-      providerMessage.setId(options.identity);
-      providerMessage.setMessage(id);
-      res = await grpcClient.gestaltsGetIdentitiy(
-        providerMessage,
+      providerMessage.setId(providerId!);
+      providerMessage.setMessage(identityId!);
+      setActionMessage.setIdentity(providerMessage);
+      name = `${id}`;
+      //Trusting.
+      await grpcClient.gestaltsSetActionByIdentity(
+        setActionMessage,
         await client.session.createJWTCallCredentials(),
       );
-    }
-    const gestalt = JSON.parse(res.getName());
-    let output: any = gestalt;
-
-    if (options.format !== 'json') {
-      //Creating a list.
-      output = [];
-      //Listing nodes.
-      for (const nodeKey of Object.keys(gestalt.nodes)) {
-        const node = gestalt.nodes[nodeKey];
-        output.push(`${node.id}`);
-      }
-      //Listing identities
-      for (const identityKey of Object.keys(gestalt.identities)) {
-        const identitiy = gestalt.identities[identityKey];
-        output.push(`${identitiy.providerId}:${identitiy.identityId}`);
-      }
     }
 
     process.stdout.write(
       outputFormatter({
         type: options.format === 'json' ? 'json' : 'list',
-        data: output,
+        data: [`Allowing: ${name} ${permissions}`],
       }),
     );
   } catch (err) {
@@ -94,15 +87,16 @@ commandGetGestalts.action(async (id, options) => {
     } else {
       process.stdout.write(
         outputFormatter({
-          type: options.format === 'json' ? 'json' : 'list',
-          data: ['Error:', err.message],
+          type: 'error',
+          description: err.description,
+          message: err.message,
         }),
       );
     }
     throw err;
   } finally {
-    client.stop();
+    await client.stop();
   }
 });
 
-export default commandGetGestalts;
+export default commandAllowGestalts;

@@ -210,16 +210,52 @@ describe('CLI vaults', () => {
       'share',
       '-np',
       dataDir,
-      '-vn',
-      'Vault1',
       '--password-file',
       passwordFile,
-      '-u',
-      '123',
-      '345',
-      '135',
+      'Vault1',
+      node1.id,
+      node2.id,
     ]);
     expect(result).toBe(0);
+    const sharedNodes = await polykeyAgent.vaults.getVaultPermissions(
+      id!,
+      undefined,
+    );
+    const sharedNodesString = JSON.stringify(sharedNodes);
+    expect(sharedNodesString).toContain(node1.id);
+    expect(sharedNodesString).toContain(node2.id);
+    expect(sharedNodesString).not.toContain(node3.id);
+  });
+  test('should unshare a vault', async () => {
+    //creating vault.
+    await polykeyAgent.vaults.createVault('Vault1');
+    const id = polykeyAgent.vaults.getVaultId('Vault1');
+    expect(id).toBeTruthy();
+
+    //init sharing.
+    await polykeyAgent.vaults.setVaultPerm(node1.id, id!);
+    await polykeyAgent.vaults.setVaultPerm(node2.id, id!);
+    await polykeyAgent.vaults.setVaultPerm(node3.id, id!);
+
+    const result = await utils.pk([
+      'vaults',
+      'unshare',
+      '-np',
+      dataDir,
+      '--password-file',
+      passwordFile,
+      'Vault1',
+      node1.id,
+      node2.id,
+      node3.id,
+    ]);
+    expect(result).toBe(0);
+    const sharedNodes = await polykeyAgent.vaults.getVaultPermissions(
+      id!,
+      undefined,
+    );
+    const sharedNodesString = JSON.stringify(sharedNodes);
+    expect(sharedNodesString).not.toContain('pull');
   });
   test('should get permissions of a vault', async () => {
     const vault = await polykeyAgent.vaults.createVault('Vault1');
@@ -236,10 +272,7 @@ describe('CLI vaults', () => {
       'perms',
       '-np',
       dataDir,
-      '-vn',
-      'Vault1',
-      '--password-file',
-      passwordFile,
+      'vault1',
     ]);
     expect(result).toBe(0);
   });
@@ -315,7 +348,7 @@ describe('CLI vaults', () => {
     const list = polykeyAgent.vaults.listVaults();
     expect(list.length).toBe(1);
     expect(list[0].name).toBe('Vault1');
-  });
+  }, 20000);
   test('should pull a vault', async () => {
     const dataDir2 = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'polykey-test-'),
@@ -416,7 +449,7 @@ describe('CLI vaults', () => {
       force: true,
       recursive: true,
     });
-  });
+  }, 20000);
   test('should scan a node for vaults', async () => {
     const dataDir2 = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'polykey-test-'),
@@ -474,7 +507,7 @@ describe('CLI vaults', () => {
   });
 });
 
-describe('CLI vaults', () => {
+describe('CLI vaults no token', () => {
   beforeEach(async () => {
     dataDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'polykey-test-'),
@@ -556,9 +589,7 @@ describe('CLI vaults', () => {
       'share',
       '-np',
       dataDir,
-      '-vn',
       'Vault1',
-      '-u',
       '123',
       '345',
       '135',
@@ -571,7 +602,6 @@ describe('CLI vaults', () => {
       'perms',
       '-np',
       dataDir,
-      '-vn',
       'Vault1',
     ]);
     expect(result).toBe(jwtTokenExitCode);
@@ -599,5 +629,15 @@ describe('CLI vaults', () => {
       '<NodeId>',
     ]);
     expect(result).toBe(jwtTokenExitCode);
+  });
+  test('does not get permissions of vault without token', async () => {
+    const result2 = await utils.pk([
+      'vaults',
+      'permissions',
+      '-np',
+      dataDir,
+      'Vault1',
+    ]);
+    expect(result2).toBe(jwtTokenExitCode);
   });
 });

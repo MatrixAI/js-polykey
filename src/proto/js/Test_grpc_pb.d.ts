@@ -5,7 +5,6 @@
 /* eslint-disable */
 
 import * as grpc from "@grpc/grpc-js";
-import {handleClientStreamingCall} from "@grpc/grpc-js/build/src/server-call";
 import * as Test_pb from "./Test_pb";
 
 interface ITestService extends grpc.ServiceDefinition<grpc.UntypedServiceImplementation> {
@@ -57,7 +56,7 @@ export const TestService: ITestService;
 export interface ITestServer extends grpc.UntypedServiceImplementation {
     unary: grpc.handleUnaryCall<Test_pb.EchoMessage, Test_pb.EchoMessage>;
     serverStream: grpc.handleServerStreamingCall<Test_pb.EchoMessage, Test_pb.EchoMessage>;
-    clientStream: handleClientStreamingCall<Test_pb.EchoMessage, Test_pb.EchoMessage>;
+    clientStream: grpc.handleClientStreamingCall<Test_pb.EchoMessage, Test_pb.EchoMessage>;
     duplexStream: grpc.handleBidiStreamingCall<Test_pb.EchoMessage, Test_pb.EchoMessage>;
 }
 

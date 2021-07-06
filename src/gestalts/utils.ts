@@ -10,6 +10,7 @@ import type { NodeId } from '../nodes/types';
 import type { IdentityId, ProviderId } from '../identities/types';
 
 import canonicalize from 'canonicalize';
+import { ErrorGestaltsInvalidAction } from '@/gestalts/errors';
 
 /**
  * Construct GestaltKey from GestaltId
@@ -72,6 +73,20 @@ function identityFromKey(
   return [identity.providerId, identity.identityId];
 }
 
+function validGestaltAction(action: string): boolean {
+  const validActions = [
+    //This list has to match GestaltAction.
+    'notify',
+    'scan',
+  ];
+  return validActions.includes(action);
+}
+
+function checkGestaltAction(action: string): void {
+  if (!validGestaltAction(action))
+    throw new ErrorGestaltsInvalidAction(`Invalid action: ${action}`);
+}
+
 export {
   gestaltKey,
   ungestaltKey,
@@ -79,4 +94,6 @@ export {
   keyFromIdentity,
   nodeFromKey,
   identityFromKey,
+  validGestaltAction,
+  checkGestaltAction,
 };

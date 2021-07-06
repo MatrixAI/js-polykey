@@ -75,6 +75,7 @@ class GitHubProvider extends Provider {
       );
     }
     // this code needs to be used by the user to manually enter
+    console.log('GUTHUB PROVIDER USER CODE: ', userCode);
     yield userCode;
     // Promise.race does not cancel unfinished promises
     // the finished condition variable is needed to stop the pollAccessToken process
@@ -156,6 +157,7 @@ class GitHubProvider extends Provider {
       );
     }
     const identityId = await this.getIdentityId(tokenData);
+    console.log('tokenData', tokenData);
     await this.putToken(identityId, tokenData);
     return identityId;
   }

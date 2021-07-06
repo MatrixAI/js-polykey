@@ -47,18 +47,29 @@ service Client {
   rpc VaultsPermissions(ShareMessage) returns (stream PermissionMessage) {};
 
   // Identities
-  rpc IdentitiesAuthenticate(ProviderMessage) returns (ProviderMessage) {};
+  rpc IdentitiesAuthenticate(ProviderMessage) returns (stream ProviderMessage) {};
   rpc TokensPut(TokenSpecificMessage) returns (EmptyMessage) {};
   rpc TokensGet(ProviderMessage) returns (TokenMessage) {};
   rpc TokensDelete(ProviderMessage) returns (EmptyMessage) {};
   rpc ProvidersGet(EmptyMessage) returns (ProviderMessage) {};
+  rpc IdentitiesGetConnectedInfos(ProviderSearchMessage) returns (stream IdentityInfoMessage) {}; // Returns a list of connected identities.
+  rpc IdentitiesGetInfo(ProviderMessage) returns (ProviderMessage) {}; // Gets current Gestalt probably? placeholder, used to return IdentityInfo
+  rpc IdentitiesAugmentKeynode (ProviderMessage) returns (EmptyMessage) {}; //Augmenting, throws error if fail.
 
   // Gestalts
-  rpc GestaltsGetNode(GestaltMessage) returns (GestaltMessage) {};
-  rpc GestaltsGetIdentity(ProviderMessage) returns (GestaltMessage) {};
-  rpc GestaltsList(EmptyMessage) returns (stream GestaltMessage) {};
-  rpc GestaltsSetNode(GestaltTrustMessage) returns (EmptyMessage) {};
-  rpc GestaltsSetIdentity(GestaltTrustMessage) returns (EmptyMessage) {};
+  rpc GestaltsGetNode(NodeMessage) returns (GestaltMessage) {};  //Returns gestalt from node id
+  rpc GestaltsGetIdentity(ProviderMessage) returns (GestaltMessage) {}; //Returns gestalt from identity id
+  rpc GestaltsList(EmptyMessage) returns (stream GestaltMessage) {};  //list of all known gestalts
+  rpc GestaltsSetNode(GestaltTrustMessage) returns (EmptyMessage) {}; // creating a link betweeen nodes
+  rpc GestaltsSetIdentity(GestaltTrustMessage) returns (EmptyMessage) {}; // creating a link between identity and node?
+  rpc GestaltsDiscoverNode(NodeMessage) returns (EmptyMessage) {}; //finds 3rd party gestalt from nodeID
+  rpc GestaltsDiscoverIdentity(ProviderMessage) returns (EmptyMessage) {}; // Finds 3rd party gestalt from identity
+  rpc GestaltsGetActionsByNode(NodeMessage) returns (ActionsMessage) {};
+  rpc GestaltsGetActionsByIdentity(ProviderMessage) returns (ActionsMessage) {};
+  rpc GestaltsSetActionByNode(SetActionsMessage) returns (EmptyMessage) {};
+  rpc GestaltsSetActionByIdentity(SetActionsMessage) returns (EmptyMessage) {};
+  rpc GestaltsUnsetActionByNode(SetActionsMessage) returns (EmptyMessage) {};
+  rpc GestaltsUnsetActionByIdentity(SetActionsMessage) returns (EmptyMessage) {};
 
   rpc GestaltSync(stream GestaltMessage) returns (stream GestaltMessage) {};
 }
@@ -174,6 +185,18 @@ message TokenMessage {
   string token = 1;
 }
 
+message ProviderSearchMessage {
+  ProviderMessage provider = 1;
+  repeated string search_term = 2;
+}
+
+message IdentityInfoMessage {
+  ProviderMessage provider = 1;
+  string name = 3;
+  string email = 4;
+  string url = 5;
+}
+
 // Gestalts
 
 message GestaltMessage {
@@ -184,4 +207,17 @@ message GestaltTrustMessage {
   string provider = 1;
   string name = 2;
   bool set = 3;
+}
+
+// Permissions
+message ActionsMessage {
+  repeated string action = 1;
+}
+
+message SetActionsMessage {
+  oneof node_or_provider {
+    NodeMessage node = 1;
+    ProviderMessage identity = 2;
+  }
+  string action = 3;
 }

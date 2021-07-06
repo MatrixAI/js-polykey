@@ -3,11 +3,11 @@ import { createCommand, outputFormatter } from '../utils';
 import Logger, { LogLevel, StreamHandler } from '@matrixai/logger';
 import PolykeyClient from '@/PolykeyClient';
 import { errors } from '@/grpc';
-import * as utils from '@/utils';
+import * as utils from '../../utils';
 
-const commandAugmentKeynode = createCommand('authenticate', {
+const commandClaimKeynode = createCommand('claim', {
   description: {
-    description: 'authenticate a social identity provider e.g. github.com',
+    description: 'Claim an identity for this keynode.',
     args: {
       providerId: 'Provider that identity is linked to',
       identityId: 'Identitiy to augment the keynode with',
@@ -17,9 +17,9 @@ const commandAugmentKeynode = createCommand('authenticate', {
   format: true,
   nodePath: true,
 });
-commandAugmentKeynode.arguments('<providerId> <identityId>');
-commandAugmentKeynode.alias('aug');
-commandAugmentKeynode.action(async (providerId, identitiyId, options) => {
+commandClaimKeynode.arguments('<providerId> <identityId>');
+commandClaimKeynode.alias('aug');
+commandClaimKeynode.action(async (providerId, identitiyId, options) => {
   const clientConfig = {};
   clientConfig['logger'] = new Logger('CLI Logger', LogLevel.WARN, [
     new StreamHandler(),
@@ -44,32 +44,9 @@ commandAugmentKeynode.action(async (providerId, identitiyId, options) => {
     providerMessage.setMessage(identitiyId);
 
     //sending message.
-    const gen = grpcClient.identitiesAuthenticate(
+    await grpcClient.identitiesAugmentKeynode(
       providerMessage,
       await client.session.createJWTCallCredentials(),
-    );
-    const codeMessage = (await gen.next()).value;
-    if (!codeMessage) throw Error('Failed to get Device code.');
-    console.log(codeMessage.getMessage());
-
-    process.stdout.write(
-      outputFormatter({
-        type: options.format === 'json' ? 'json' : 'list',
-        data: [`Your device code is: ${codeMessage.getMessage()}`],
-      }),
-    );
-
-    const successMessage = (await gen.next()).value;
-    if (!successMessage) throw Error('failed to authenticate user.');
-    console.log(successMessage.getMessage());
-
-    process.stdout.write(
-      outputFormatter({
-        type: options.format === 'json' ? 'json' : 'list',
-        data: [
-          `Successfully authenticated user: ${successMessage.getMessage()}`,
-        ],
-      }),
     );
   } catch (err) {
     if (err instanceof errors.ErrorGRPCClientTimeout) {
@@ -78,7 +55,7 @@ commandAugmentKeynode.action(async (providerId, identitiyId, options) => {
     if (err instanceof errors.ErrorGRPCServerNotStarted) {
       process.stderr.write(`${err.message}\n`);
     } else {
-      process.stderr.write(
+      process.stdout.write(
         outputFormatter({
           type: options.format === 'json' ? 'json' : 'list',
           data: ['Error:', err.message],
@@ -91,4 +68,4 @@ commandAugmentKeynode.action(async (providerId, identitiyId, options) => {
   }
 });
 
-export default commandAugmentKeynode;
+export default commandClaimKeynode;
