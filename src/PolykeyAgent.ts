@@ -25,6 +25,7 @@ import { IAgentServer } from './proto/js/Agent_grpc_pb';
 import { IClientServer } from './proto/js/Client_grpc_pb';
 import { createAgentService, AgentService } from './agent';
 import { createClientService, ClientService } from './client';
+import { NotificationsManager } from './notifications';
 
 class Polykey {
   public readonly nodePath: string;
@@ -35,6 +36,7 @@ class Polykey {
   public readonly nodes: NodeManager;
   public readonly gestalts: GestaltGraph;
   public readonly identities: IdentitiesManager;
+  public readonly notifications: NotificationsManager;
   public readonly workers: WorkerManager;
   public readonly sigchain: Sigchain;
   public readonly acl: ACL;
@@ -64,6 +66,7 @@ class Polykey {
     gestaltGraph,
     identitiesManager,
     sigchain,
+    notificationsManager,
     acl,
     db,
     workerManager,
@@ -84,6 +87,7 @@ class Polykey {
     gestaltGraph?: GestaltGraph;
     identitiesManager?: IdentitiesManager;
     sigchain?: Sigchain;
+    notificationsManager?: NotificationsManager;
     acl?: ACL;
     db?: DB;
     workerManager?: WorkerManager;
@@ -184,6 +188,14 @@ class Polykey {
       new IdentitiesManager({
         db: this.db,
         logger: this.logger.getChild('IdentitiesManager'),
+      });
+    this.notifications =
+      notificationsManager ??
+      new NotificationsManager({
+        acl: this.acl,
+        db: this.db,
+        nodeManager: this.nodes,
+        logger: this.logger.getChild('NotificationsManager'),
       });
     this.workers =
       workerManager ??
@@ -303,6 +315,7 @@ class Polykey {
     await this.vaults.start({ fresh });
     // await this.gestalts.start({ fresh });
     await this.identities.start({ fresh });
+    await this.notifications.start({ fresh });
 
     const keyPrivatePem = this.keys.getRootKeyPairPem().privateKey;
     const certChainPem = await this.keys.getRootCertChainPem();
@@ -366,6 +379,8 @@ class Polykey {
     await this.revProxy.stop();
 
     await this.gitManager.stop();
+
+    await this.notifications.stop();
 
     await this.identities.stop();
     // await this.gestalts.stop();

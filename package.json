@@ -75,6 +75,7 @@
     "jsonwebtoken": "^8.5.1",
     "level": "^6.0.1",
     "lexicographic-integer": "^1.1.0",
+    "monotonic-lexicographic-timestamp": "^1.0.0",
     "multihashing": "^0.3.3",
     "node-forge": "^0.10.0",
     "oauth2orize": "^1.11.0",
