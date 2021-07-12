@@ -1,35 +1,20 @@
+import type { EncryptedFS } from 'encryptedfs';
+import type { VaultId } from './types';
 import type { FileSystem } from '../types';
 
 import fs from 'fs';
 import path from 'path';
 import base58 from 'bs58';
-import { EncryptedFS } from 'encryptedfs';
-
-import * as utils from '../utils';
-import * as vaultErrors from './errors';
 import * as keysUtils from '../keys/utils';
+import * as utils from '../utils';
 
-const KEY_LEN = 32;
-const ID_LEN = 42;
-
-async function generateVaultKey() {
-  const key = await keysUtils.getRandomBytes(KEY_LEN);
-  return Buffer.from(key);
+async function generateVaultKey(bits: number = 256) {
+  return await keysUtils.generateKey(bits);
 }
 
-function generateVaultKeySync() {
-  const key = keysUtils.getRandomBytesSync(KEY_LEN);
-  return Buffer.from(key);
-}
-
-async function generateVaultId() {
-  const id = await keysUtils.getRandomBytes(ID_LEN);
-  return base58.encode(id);
-}
-
-function generateVaultIdSync() {
-  const id = keysUtils.getRandomBytesSync(ID_LEN);
-  return base58.encode(id);
+async function generateVaultId(): Promise<VaultId> {
+  const id = await keysUtils.getRandomBytes(32);
+  return base58.encode(id) as VaultId;
 }
 
 async function fileExists(fs: FileSystem, path): Promise<boolean> {
@@ -69,38 +54,10 @@ async function* readdirRecursivelyEFS(fs: EncryptedFS, dir: string) {
   }
 }
 
-function serializeEncrypt<T>(key: Buffer, value: T): Buffer {
-  return keysUtils.encryptWithKey(
-    key,
-    Buffer.from(JSON.stringify(value), 'utf-8'),
-  );
-}
-
-function unserializeDecrypt<T>(key: Buffer, data: Buffer): T {
-  const value_ = keysUtils.decryptWithKey(key, data);
-  if (!value_) {
-    throw new vaultErrors.ErrorVaultMapDecrypt();
-  }
-  let value;
-  try {
-    value = JSON.parse(value_.toString('utf-8'));
-  } catch (e) {
-    if (e instanceof SyntaxError) {
-      throw new vaultErrors.ErrorVaultMapParse();
-    }
-    throw e;
-  }
-  return value;
-}
-
 export {
   generateVaultKey,
-  generateVaultKeySync,
   generateVaultId,
-  generateVaultIdSync,
   fileExists,
   readdirRecursively,
   readdirRecursivelyEFS,
-  serializeEncrypt,
-  unserializeDecrypt,
 };
