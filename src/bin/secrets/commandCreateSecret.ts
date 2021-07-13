@@ -8,9 +8,9 @@ import * as binUtils from '../utils';
 import * as CLIErrors from '../errors';
 import * as grpcErrors from '../../grpc/errors';
 
-const commandCreateSecret = binUtils.createCommand('create', {
+const commandCreateSecret = binUtils.createCommand('put', {
   description: 'Creates a secret within a given vault',
-  aliases: ['touch', 'new'],
+  aliases: ['create', 'touch', 'new'],
   nodePath: true,
   verbose: true,
   format: true,

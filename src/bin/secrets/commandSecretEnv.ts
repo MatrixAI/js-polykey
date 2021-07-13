@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import path from 'path';
 import Logger, { LogLevel, StreamHandler } from '@matrixai/logger';
 import * as grpc from '@grpc/grpc-js';
 import { clientPB } from '../../client';
@@ -16,12 +16,8 @@ const commandSecretEnv = binUtils.createCommand('env', {
   passwordFile: true,
 });
 commandSecretEnv.option(
-  '--command <command>',
-  'In the environment of the derivation, run the shell command cmd in an interactive shell (Use --run to use a non-interactive shell instead)',
-);
-commandSecretEnv.option(
-  '--run <run>',
-  'In the environment of the derivation, run the shell command cmd in a non-interactive shell, meaning (among other things) that if you hit Ctrl-C while the command is running, the shell exits (Use --command to use an interactive shell instead)',
+  '-e, --export',
+  'Export all variables',
 );
 commandSecretEnv.arguments(
   "Secrets to inject into env, of the format '<vaultName>:<secretPath>[=<variableName>]', you can also control what the environment variable will be called using '[<variableName>]' (defaults to upper, snake case of the original secret name)",
@@ -42,36 +38,26 @@ commandSecretEnv.action(async (options, command) => {
     ? options.nodePath
     : utils.getDefaultNodePath();
 
+  let shellCommand;
+  const data: string[] = [];
+
   const client = new PolykeyClient(clientConfig);
   const vaultSpecificMessage = new clientPB.VaultSpecificMessage();
   const vaultMessage = new clientPB.VaultMessage();
-  const secretPathList: string[] = Array.from<string>(command.args.values());
 
   try {
+    const secretPathList: string[] = Array.from<string>(command.args.values());
+
     if (secretPathList.length < 1) {
       throw new CLIErrors.ErrorSecretsUndefined();
     }
 
-    const parsedPathList: {
-      vaultName: string;
-      secretName: string;
-      variableName: string;
-    }[] = [];
+    if(!binUtils.pathRegex.test(secretPathList[secretPathList.length - 1])) {
+      shellCommand = secretPathList.pop();
+    }
 
-    for (const path of secretPathList) {
-      if (!binUtils.pathRegex.test(path)) {
-        throw new CLIErrors.ErrorSecretPathFormat();
-      }
-
-      const [, vaultName, secretName, variableName] = path.match(
-        binUtils.pathRegex,
-      )!;
-      parsedPathList.push({
-        vaultName,
-        secretName,
-        variableName:
-          variableName ?? secretName.toUpperCase().replace('-', '_'),
-      });
+    if (secretPathList.length < 1) {
+      throw new CLIErrors.ErrorSecretsUndefined();
     }
 
     const secretEnv = { ...process.env };
@@ -79,47 +65,67 @@ commandSecretEnv.action(async (options, command) => {
     await client.start({});
     const grpcClient = client.grpcClient;
 
-    for (const obj of parsedPathList) {
-      vaultMessage.setName(obj.vaultName);
-      vaultSpecificMessage.setVault(vaultMessage);
-      vaultSpecificMessage.setName(obj.secretName);
-      const res = await grpcClient.vaultsGetSecret(vaultSpecificMessage, meta);
-      const secret = res.getName();
-      secretEnv[obj.variableName] = secret;
-    }
+    let output = '';
+    let secrets: string[] = [];
 
-    const shellPath = process.env.SHELL ?? 'sh';
-    const args: string[] = [];
+    for (const secPath of secretPathList) {
+      if (secPath.includes(':')) {
+        if (options.export) {
+          output = 'export ';
+        }
 
-    if (options.command && options.run) {
-      throw new CLIErrors.ErrorInvalidArguments(
-        'Only one of --command or --run can be specified',
-      );
-    } else if (options.command) {
-      args.push('-i');
-      args.push('-c');
-      args.push(`"${options.command}"`);
-    } else if (options.run) {
-      args.push('-c');
-      args.push(`"${options.run}"`);
-    }
+        const [, vaultName, secretName, glob, variableName] = secPath.match(
+          binUtils.pathRegex,
+        )!;
 
-    const shell = spawn(shellPath, args, {
-      stdio: 'inherit',
-      env: secretEnv,
-      shell: true,
-    });
+        if (glob) {
+          vaultMessage.setName(vaultName);
 
-    shell.on('close', (code) => {
-      if (code != 0) {
-        process.stdout.write(
-          binUtils.outputFormatter({
-            type: options.format === 'json' ? 'json' : 'list',
-            data: [`Terminated with ${code}`],
-          }),
-        );
+          const secretListGenerator = grpcClient.vaultsListSecrets(
+            vaultMessage,
+            meta,
+          );
+
+          for await (const secret of secretListGenerator) {
+            const sec = secret.getName();
+            if (sec.includes(secretName))
+            secrets.push(`${sec}`);
+          }
+        } else {
+          secrets.push(secretName);
+        }
+
+        for (const secName of secrets) {
+          vaultMessage.setName(vaultName);
+          vaultSpecificMessage.setVault(vaultMessage);
+          vaultSpecificMessage.setName(secName);
+          const res = await grpcClient.vaultsGetSecret(vaultSpecificMessage, meta);
+          const secret = res.getName();
+          const varName = variableName ?? path.basename(secName.toUpperCase().replace('-', '_'));
+          secretEnv[varName] = secret;
+
+          data.push(output + `${varName}=${secret}`);
+        }
+        output = '';
+        secrets = [];
+      } else if (secPath === '-e' || secPath === '--export') {
+        output += 'export ';
+      } else {
+        throw new CLIErrors.ErrorSecretPathFormat();
       }
-    });
+    }
+
+    if(shellCommand) {
+      binUtils.spawnShell(shellCommand, secretEnv, options.format);
+    } else {
+      process.stdout.write(
+        binUtils.outputFormatter({
+          type: options.format === 'json' ? 'json' : 'list',
+          data: data,
+        }),
+      );
+    }
+
   } catch (err) {
     if (err instanceof grpcErrors.ErrorGRPCClientTimeout) {
       process.stderr.write(`${err.message}\n`);

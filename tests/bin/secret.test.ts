@@ -41,6 +41,78 @@ describe('CLI secrets', () => {
     });
   });
 
+  test('should export secrets', async () => {
+    const stdoutSpy = jest.spyOn(process.stdout, 'write');
+
+    const vault = await polykeyAgent.vaults.createVault('Vault1');
+    await vault.initializeVault();
+    const vault2 = await polykeyAgent.vaults.createVault('Vault2');
+    await vault2.initializeVault();
+
+    await vault.addSecret('TEST VAR 1', Buffer.from('test-1'));
+    await vault.addSecret('TEST_VAR_2', Buffer.from('test-2'));
+    await vault2.addSecret('TEST_VAR_3', Buffer.from('test-3'));
+
+    const message = 'export TEST VAR 1=test-1\nTEST_VAR_3=test-3\nexport TEST_VAR_4=test-2\n';
+    const message2 = 'export TEST VAR 1=test-1\nexport TEST_VAR_2=test-2\nexport TEST_VAR_3=test-3\n';
+
+    const result = await utils.pk([
+      'secrets',
+      'env',
+      '-np',
+      dataDir,
+      '--password-file',
+      passwordFile,
+      '--',
+      '-e',
+      'Vault1:TEST VAR 1',
+      'Vault2:TEST_VAR_3',
+      '-e',
+      'Vault1:TEST_VAR_2=TEST_VAR_4',
+    ]);
+    expect(result).toBe(0);
+    expect(stdoutSpy).toHaveBeenLastCalledWith(message);
+
+    const result2 = await utils.pk([
+      'secrets',
+      'env',
+      '-np',
+      dataDir,
+      '--password-file',
+      passwordFile,
+      '-e',
+      'Vault1:*',
+      'Vault2:TEST_VAR_3',
+    ]);
+    expect(result2).toBe(0);
+    expect(stdoutSpy).toHaveBeenLastCalledWith(message2);
+  });
+
+  test('should export globbed secrets', async () => {
+    const stdoutSpy = jest.spyOn(process.stdout, 'write');
+
+    const vault = await polykeyAgent.vaults.createVault('Vault1');
+    await vault.initializeVault();
+
+    await vault.mkdir('dir1/dir2', { recursive: true });
+    await vault.addSecret('dir1/dir2/TEST VAR 1', Buffer.from('test-1'));
+    await vault.addSecret('dir1/dir2/TEST_VAR_2', Buffer.from('test-2'));
+
+    const message = 'export TEST VAR 1=test-1\nexport TEST_VAR_2=test-2\n';
+
+    const result = await utils.pk([
+      'secrets',
+      'env',
+      '-np',
+      dataDir,
+      '--password-file',
+      passwordFile,
+      '-e',
+      'Vault1:dir1/dir2/*',
+    ]);
+    expect(result).toBe(0);
+    expect(stdoutSpy).toHaveBeenLastCalledWith(message);
+  });
   test('should create secrets', async () => {
     const vault = await polykeyAgent.vaults.createVault('Vault1');
     await vault.initializeVault();
