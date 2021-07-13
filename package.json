@@ -34,8 +34,8 @@
     "polykey": "dist/bin/polykey.js",
     "pk": "dist/bin/polykey.js"
   },
-  "main": "dist/Polykey.js",
-  "types": "dist/Polykey.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p ./tsconfig.build.json",
     "postbuild": "cp -fR src/proto dist",
