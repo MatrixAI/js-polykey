@@ -7,11 +7,12 @@ import fs from 'fs';
 import path from 'path';
 import Logger from '@matrixai/logger';
 import { Mutex } from 'async-mutex';
+import git from 'isomorphic-git';
 import Vault from './Vault';
 import VaultMap from './VaultMap';
 
 import { generateVaultKey, fileExists, generateVaultId } from './utils';
-import { KeyManager, errors as keysErrors } from '../keys';
+import { KeyManager } from '../keys';
 import { NodeManager } from '../nodes';
 import { GitFrontend } from '../git';
 import { GestaltGraph } from '../gestalts';
@@ -20,11 +21,15 @@ import { DB } from '../db';
 
 import * as utils from '../utils';
 import * as errors from './errors';
+import * as keysErrors from '../keys/errors';
+import * as gitErrors from '../git/errors';
+import * as nodesErrors from '../nodes/errors';
 import * as aclErrors from '../acl/errors';
 import * as gestaltErrors from '../gestalts/errors';
 
 class VaultManager {
   public readonly vaultsPath: string;
+  protected nodeId: string;
   protected acl: ACL;
   protected gestaltGraph: GestaltGraph;
   protected fs: FileSystem;
@@ -35,7 +40,7 @@ class VaultManager {
   protected gitFrontend: GitFrontend;
   protected workerManager?: WorkerManager;
   private vaults: Vaults;
-  private _started: boolean;
+  protected _started: boolean;
 
   // Concurrency for metadata
   private metadataMutex: Mutex = new Mutex();
@@ -50,6 +55,7 @@ class VaultManager {
   constructor({
     vaultsPath,
     keyManager,
+    nodeManager,
     db,
     acl,
     gestaltGraph,
@@ -58,6 +64,7 @@ class VaultManager {
   }: {
     vaultsPath: string;
     keyManager: KeyManager;
+    nodeManager: NodeManager;
     db: DB;
     acl: ACL;
     gestaltGraph: GestaltGraph;
@@ -66,6 +73,7 @@ class VaultManager {
   }) {
     this.vaultsPath = vaultsPath;
     this.keyManager = keyManager;
+    this.nodeManager = nodeManager;
     this.acl = acl;
     this.gestaltGraph = gestaltGraph;
     this.fs = fs ?? require('fs');
@@ -78,6 +86,13 @@ class VaultManager {
       logger: this.logger,
     });
     this.gitFrontend = new GitFrontend();
+  }
+
+  get started(): boolean {
+    if (this._started && this.keyManager.started && this.gitFrontend) {
+      return true;
+    }
+    return false;
   }
 
   public setWorkerManager(workerManager: WorkerManager) {
@@ -95,8 +110,10 @@ class VaultManager {
   }
 
   public async start({ fresh = false }: { fresh?: boolean }) {
-    if (!this.keyManager.started) {
+    if (!this.keyManager.started ) {
       throw new keysErrors.ErrorKeyManagerNotStarted();
+    } else if (!(await this.nodeManager.started())) {
+      throw new nodesErrors.ErrorNodeManagerNotStarted();
     }
     if (fresh) {
       await this.fs.promises.rm(this.vaultsPath, {
@@ -119,19 +136,6 @@ class VaultManager {
     }
     this._started = false;
     this.logger.info('Stopped Vault Manager');
-  }
-
-  /**
-   * Checks to see whether or not the current VaultManager instance has been started.
-   *
-   * Checks for: _started, keyManager and gitFrontend
-   * @returns true if all vaultManager components have been constructed
-   */
-  public async started(): Promise<boolean> {
-    if (this._started && this.keyManager && this.gitFrontend) {
-      return true;
-    }
-    return false;
   }
 
   /**
@@ -170,6 +174,81 @@ class VaultManager {
     this.vaults[id] = { vault: vault, vaultKey: key, vaultName: vaultName };
 
     return vault;
+  }
+
+    /**
+   * Clones a vault from another node
+   *
+   * @throws ErrorRemoteVaultUndefined if vaultName does not exist on
+   * connected node
+   * @throws ErrorNodeConnectionNotExist if the address of the node to connect to
+   * does not exist
+   * @throws ErrorRGitPermissionDenied if the node cannot access the desired vault
+   * @param vaultId Id of vault
+   * @param nodeId identifier of node to clone from
+   */
+  public async cloneVault(vaultId: string, nodeId: string): Promise<void> {
+    const nodeAddress = await this.nodeManager.getNode(nodeId as NodeId);
+    if (!nodeAddress) {
+      throw new nodesErrors.ErrorNodeConnectionNotExist(
+        'Node does not exist in node store',
+      );
+    }
+    this.nodeManager.createConnectionToNode(nodeId as NodeId, nodeAddress);
+    const client = this.nodeManager.getClient(nodeId as NodeId);
+
+    // Send a message to the connected agent to see if the clone can occur
+    const vaultPermMessage = new agentPB.VaultPermMessage();
+    vaultPermMessage.setNodeid(this.nodeManager.getNodeId());
+    vaultPermMessage.setVaultid(vaultId);
+    const permission = await client.checkVaultPermissions(vaultPermMessage);
+    if (permission.getPermission() === false) {
+      throw new gitErrors.ErrorGitPermissionDenied();
+    }
+    const gitRequest = this.gitFrontend.connectToNodeGit(
+      client,
+      this.nodeManager.getNodeId(),
+    );
+    const vaultUrl = `http://0.0.0.0/${vaultId}`;
+    const info = await git.getRemoteInfo({
+      http: gitRequest,
+      url: vaultUrl,
+    });
+    if (!info.refs) {
+      // node does not have vault
+      throw new errors.ErrorRemoteVaultUndefined(
+        `${vaultId} does not exist on connected node ${nodeId}`,
+      );
+    }
+    const list = await gitRequest.scanVaults();
+    let vaultName;
+    for (const elem in list) {
+      const value = list[elem].split('\t');
+      if (value[0] === vaultId) {
+        vaultName = value[1];
+        break;
+      }
+    }
+    if (!vaultName) {
+      throw new errors.ErrorRemoteVaultUndefined(
+        `${vaultId} does not exist on connected node ${nodeId}`,
+      );
+    } else if (this.getVaultId(vaultName)) {
+      this.logger.warn(
+        `Vault Name '${vaultName}' already exists, cloned into '${vaultName} copy' instead`,
+      );
+      vaultName += ' copy';
+    }
+    const vault = await this.createVault(vaultName);
+    this.setLinkVault(vault.vaultId, vaultId);
+    await git.clone({
+      fs: vault.EncryptedFS,
+      http: gitRequest,
+      dir: vault.vaultId,
+      url: vaultUrl,
+      ref: 'master',
+      singleBranch: true,
+    });
   }
 
   /**

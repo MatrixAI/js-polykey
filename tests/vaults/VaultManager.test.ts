@@ -436,40 +436,14 @@ describe('VaultManager is', () => {
     await acl.stop();
     await db.stop();
 
-    const dbPath = `${dataDir}/db`;
-    const db2 = new DB({ dbPath, logger });
-    await db2.start({
+    await db.start({
       keyPair: keyManager.getRootKeyPair(),
     });
+    await acl.start();
+    await gestaltGraph.start();
+    await vaultManager.start({});
 
-    const acl2 = new ACL({
-      db: db2,
-      logger: logger,
-    });
-
-    await acl2.start();
-
-    const gestaltGraph2 = new GestaltGraph({
-      db: db2,
-      acl: acl2,
-      logger: logger,
-    });
-
-    await gestaltGraph2.start();
-
-    const vaultManager2 = new VaultManager({
-      vaultsPath: path.join(dataDir, 'vaults'),
-      keyManager: keyManager,
-      db: db2,
-      acl: acl,
-      gestaltGraph: gestaltGraph,
-      fs: fs,
-      logger: logger,
-    });
-
-    await vaultManager2.start({});
-
-    const vaults2 = vaultManager2.listVaults();
+    const vaults2 = vaultManager.listVaults();
     let vaultId2: string = '';
     for (const v of vaults2) {
       if (v.name === 'Vault1') {
@@ -479,18 +453,18 @@ describe('VaultManager is', () => {
     }
     // implicit test of keys
     expect(vault.EncryptedFS.Stats).toEqual(
-      vaultManager2.getVault(vaultId2).EncryptedFS.Stats,
+      vaultManager.getVault(vaultId2).EncryptedFS.Stats,
     );
     const vn: Array<string> = [];
-    vaultManager2.listVaults().forEach((a) => vn.push(a.name));
+    vaultManager.listVaults().forEach((a) => vn.push(a.name));
     expect(vn.sort()).toEqual(vaultNames.sort());
 
-    expect(vaultManager2.getLinkVault('12345667889')?.vaultId).toBe(id);
+    expect(vaultManager.getLinkVault('12345667889')?.vaultId).toBe(id);
 
-    await vaultManager2.stop();
-    await gestaltGraph2.stop();
-    await acl2.stop();
-    await db2.stop();
+    await vaultManager.stop();
+    await gestaltGraph.stop();
+    await acl.stop();
+    await db.stop();
   });
   test('able to recover metadata after complex operations', async () => {
     const vaultNames = [
@@ -557,56 +531,30 @@ describe('VaultManager is', () => {
     await acl.stop();
     await db.stop();
 
-    const dbPath = `${dataDir}/db`;
-    const db2 = new DB({ dbPath, logger });
-    await db2.start({
+    await db.start({
       keyPair: keyManager.getRootKeyPair(),
     });
+    await acl.start();
+    await gestaltGraph.start();
+    await vaultManager.start({});
 
-    const acl2 = new ACL({
-      db: db2,
-      logger: logger,
-    });
-
-    await acl2.start();
-
-    const gestaltGraph2 = new GestaltGraph({
-      db: db2,
-      acl: acl2,
-      logger: logger,
-    });
-
-    await gestaltGraph2.start();
-
-    const vaultManager2 = new VaultManager({
-      vaultsPath: path.join(dataDir, 'vaults'),
-      keyManager: keyManager,
-      db: db2,
-      acl: acl,
-      gestaltGraph: gestaltGraph,
-      fs: fs,
-      logger: logger,
-    });
-
-    await vaultManager2.start({});
-
-    await vaultManager2.createVault('Pumpkin');
+    await vaultManager.createVault('Pumpkin');
 
     // implicit test of keys
-    const v102 = vaultManager2.getVaultId('Vault10');
+    const v102 = vaultManager.getVaultId('Vault10');
     expect(v102).toBeTruthy();
     expect(vault9.EncryptedFS.Stats).toEqual(
-      vaultManager2.getVault(v102!).EncryptedFS.Stats,
+      vaultManager.getVault(v102!).EncryptedFS.Stats,
     );
-    const secret = await vaultManager2.getVault(v102!).getSecret('MySecret');
+    const secret = await vaultManager.getVault(v102!).getSecret('MySecret');
     expect(secret.toString()).toBe('MyActualPassword');
     alteredVaultNames.push('Pumpkin');
-    expect(vaultManager2.listVaults().length).toEqual(alteredVaultNames.length);
+    expect(vaultManager.listVaults().length).toEqual(alteredVaultNames.length);
 
-    await vaultManager2.stop();
-    await gestaltGraph2.stop();
-    await acl2.stop();
-    await db2.stop();
+    await vaultManager.stop();
+    await gestaltGraph.stop();
+    await acl.stop();
+    await db.stop();
   });
 });
 
