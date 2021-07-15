@@ -1,4 +1,5 @@
 import type { FileChanges } from './types';
+import type { WorkerManager } from '../workers';
 
 import fs from 'fs';
 import path from 'path';
@@ -20,6 +21,7 @@ class Vault {
   protected vaultDir: string;
   protected lock: Mutex = new Mutex();
   protected logger: Logger;
+  protected workerManager?: WorkerManager;
 
   constructor({
     vaultId,
@@ -44,6 +46,16 @@ class Vault {
 
   get locked(): boolean {
     return this.lock.isLocked();
+  }
+
+  public setWorkerManager(workerManager: WorkerManager) {
+    this.workerManager = workerManager;
+    this.efs.setWorkerManager(workerManager);
+  }
+
+  public unsetWorkerManager() {
+    delete this.workerManager;
+    this.efs.unsetWorkerManager();
   }
 
   public async start() {
@@ -311,6 +323,7 @@ class Vault {
       const absoluteDirPath = path.resolve(secretDirectory);
 
       const exists = utils.promisify(this.efs.exists).bind(this.efs);
+      const readdir = utils.promisify(this.efs.readdir).bind(this.efs);
       const writeFile = utils.promisify(this.efs.writeFile).bind(this.efs);
       const mkdir = utils.promisify(this.efs.mkdir).bind(this.efs);
 

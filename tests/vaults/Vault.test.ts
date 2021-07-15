@@ -8,6 +8,7 @@ import Logger, { LogLevel, StreamHandler } from '@matrixai/logger';
 import { generateVaultId, generateVaultKey } from '@/vaults/utils';
 import { getRandomBytes } from '@/keys/utils';
 import { WorkerManager } from '@/workers';
+import { EncryptedFS } from 'encryptedfs';
 import * as errors from '@/vaults/errors';
 import * as utils from '@/utils';
 
@@ -274,453 +275,358 @@ describe('Vault is', () => {
     );
     await vault.stop();
   });
-  // test('listing secret directories', async () => {
-  //   const secretDir = await fs.promises.mkdtemp(
-  //     path.join(os.tmpdir(), 'secret-directory-'),
-  //   );
-  //   const secretDirName = path.basename(secretDir);
-  //   try {
-  //     for (let i = 0; i < 10; i++) {
-  //       const name = 'secret ' + i.toString();
-  //       const content = await getRandomBytes(5);
-  //       await fs.promises.writeFile(path.join(secretDir, name), content);
-  //     }
-  //     await vault.create();
-  //     await vault.initializeVault();
-  //     await vault.addSecretDirectory(secretDir);
+  test('listing secret directories', async () => {
+    const secretDir = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'secret-directory-'),
+    );
+    const secretDirName = path.basename(secretDir);
+    for (let i = 0; i < 10; i++) {
+      const name = 'secret ' + i.toString();
+      const content = await getRandomBytes(5);
+      await fs.promises.writeFile(path.join(secretDir, name), content);
+    }
+    await vault.start();
+    await vault.addSecretDirectory(secretDir);
+    expect(await vault.listSecrets()).toStrictEqual([
+      path.join(secretDirName, `secret 0`),
+      path.join(secretDirName, `secret 1`),
+      path.join(secretDirName, `secret 2`),
+      path.join(secretDirName, `secret 3`),
+      path.join(secretDirName, `secret 4`),
+      path.join(secretDirName, `secret 5`),
+      path.join(secretDirName, `secret 6`),
+      path.join(secretDirName, `secret 7`),
+      path.join(secretDirName, `secret 8`),
+      path.join(secretDirName, `secret 9`),
+    ]);
+    await vault.stop();
+    await fs.promises.rm(secretDir, {
+      force: true,
+      recursive: true,
+    });
+  });
+  test('adding hidden files and directories', async () => {
+    await vault.start();
+    await vault.addSecret('.hiddenSecret', 'hidden_contents');
+    await vault.mkdir('.hiddenDir', { recursive: true });
+    await vault.addSecret(
+      '.hiddenDir/.hiddenInSecret',
+      'hidden_inside',
+    );
+    const list = await vault.listSecrets();
+    expect(list.sort()).toStrictEqual(
+      ['.hiddenSecret', '.hiddenDir/.hiddenInSecret'].sort(),
+    );
+    await vault.stop();
+  });
+  test('updating and deleting hidden files and directories', async () => {
+    await vault.start();
+    await vault.addSecret('.hiddenSecret', 'hidden_contents');
+    await vault.mkdir('.hiddenDir', { recursive: true });
+    await vault.addSecret(
+      '.hiddenDir/.hiddenInSecret',
+      'hidden_inside',
+    );
+    await vault.updateSecret('.hiddenSecret', 'change_contents');
+    await vault.updateSecret(
+      '.hiddenDir/.hiddenInSecret',
+      'change_inside',
+    );
+    await vault.renameSecret('.hiddenSecret', '.hidingSecret');
+    await vault.renameSecret('.hiddenDir', '.hidingDir');
+    let list = await vault.listSecrets();
+    expect(list.sort()).toStrictEqual(
+      ['.hidingSecret', '.hidingDir/.hiddenInSecret'].sort(),
+    );
+    await expect(vault.getSecret('.hidingSecret')).resolves.toStrictEqual(
+      'change_contents',
+    );
+    await expect(
+      vault.getSecret('.hidingDir/.hiddenInSecret'),
+    ).resolves.toStrictEqual('change_inside');
+    await vault.deleteSecret('.hidingSecret', { recursive: true });
+    await vault.deleteSecret('.hidingDir', { recursive: true });
+    list = await vault.listSecrets();
+    expect(list.sort()).toStrictEqual([].sort());
+    await vault.stop();
+  });
+  test('adding and committing a secret 150 times on vfs', async () => {
+    const vfs = new VirtualFS();
+    const mkdirp = utils.promisify(vfs.mkdirp).bind(vfs);
+    const writeFile = utils.promisify(vfs.writeFile).bind(vfs);
+    const exists = utils.promisify(vfs.exists).bind(vfs);
+    await vault.start();
+    const fileSystem = { promises: vfs.promises };
+    if (!fileSystem) {
+      throw Error();
+    }
+    const vaultId = vault.vaultId;
+    await mkdirp(path.join(dataDir, vaultId), {
+      recursive: true,
+    });
+    await git.init({
+      fs: vfs,
+      dir: path.join(dataDir, vaultId),
+    });
+    await git.commit({
+      fs: vfs,
+      dir: path.join(dataDir, vaultId),
+      author: {
+        name: vaultId,
+      },
+      message: 'Initial Commit',
+    });
+    await writeFile(
+      path.join(path.join(dataDir, vaultId), '.git', 'packed-refs'),
+      '# pack-refs with: peeled fully-peeled sorted',
+    );
+    for (let i = 0; i < 150; i++) {
+      const name = 'secret ' + i.toString();
+      const content = await getRandomBytes(5);
+      const writePath = path.join(dataDir, vaultId, name);
+      await writeFile(writePath, content, {});
+      await git.add({
+        fs: vfs,
+        dir: path.join(dataDir, vaultId),
+        filepath: name,
+      });
+      await git.commit({
+        fs: vfs,
+        dir: path.join(dataDir, vaultId),
+        author: {
+          name: vaultId,
+        },
+        message: `Add secret: ${name}`,
+      });
+      await expect(exists(path.join(dataDir, vaultId))).rejects.toBe(true);
+    }
+    await vault.stop();
+  });
+  test('adding and committing a secret 100 times on efs', async () => {
+    const efs = new EncryptedFS(await getRandomBytes(32), fs, dataDir);
+    const exists = utils.promisify(efs.exists).bind(efs);
+    const mkdir = utils.promisify(efs.mkdir).bind(efs);
+    const writeFile = utils.promisify(efs.writeFile).bind(efs);
+    const vaultId = vault.vaultId;
+    await mkdir(path.join(dataDir, vaultId), {
+      recursive: true,
+    });
+    await git.init({
+      fs: efs,
+      dir: path.join(dataDir, vaultId),
+    });
+    await git.commit({
+      fs: efs,
+      dir: path.join(dataDir, vaultId),
+      author: {
+        name: vaultId,
+      },
+      message: 'Initial Commit',
+    });
+    await writeFile(
+      path.join(path.join(dataDir, vaultId), '.git', 'packed-refs'),
+      '# pack-refs with: peeled fully-peeled sorted',
+    );
+    for (let i = 0; i < 100; i++) {
+      const name = 'secret ' + i.toString();
+      const content = await getRandomBytes(5);
+      const writePath = path.join(dataDir, vaultId, name);
+      await writeFile(writePath, content, {});
+      await git.add({
+        fs: efs,
+        dir: path.join(dataDir, vaultId),
+        filepath: name,
+      });
+      await git.commit({
+        fs: efs,
+        dir: path.join(dataDir, vaultId),
+        author: {
+          name: vaultId,
+        },
+        message: `Add secret: ${name}`,
+      });
 
-  //     expect(await vault.listSecrets()).toStrictEqual([
-  //       path.join(secretDirName, `secret 0`),
-  //       path.join(secretDirName, `secret 1`),
-  //       path.join(secretDirName, `secret 2`),
-  //       path.join(secretDirName, `secret 3`),
-  //       path.join(secretDirName, `secret 4`),
-  //       path.join(secretDirName, `secret 5`),
-  //       path.join(secretDirName, `secret 6`),
-  //       path.join(secretDirName, `secret 7`),
-  //       path.join(secretDirName, `secret 8`),
-  //       path.join(secretDirName, `secret 9`),
-  //     ]);
-  //   } finally {
-  //     await vault.destroy();
-  //     await fs.promises.rm(secretDir, {
-  //       force: true,
-  //       recursive: true,
-  //     });
-  //   }
-  // });
-  // test('adding hidden files and directories', async () => {
-  //   try {
-  //     await vault.create();
-  //     await vault.initializeVault();
+      await expect(exists(path.join(dataDir, vaultId, name))).resolves.toBe(
+        true,
+      );
+    }
+  });
+  test('adding a directory of 1 secret', async () => {
+    const secretDir = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'secret-directory-'),
+    );
+    const secretDirName = path.basename(secretDir);
+    const name = 'secret';
+    const content = await getRandomBytes(5);
+    await fs.promises.writeFile(path.join(secretDir, name), content);
+    await vault.start();
+    await vault.addSecretDirectory(path.join(secretDir));
+    await expect(
+      fs.promises.readdir(path.join(dataDir, efsId, `${secretDirName}.data`))
+    ).resolves.toContain('secret.data');
+    await vault.stop();
+    await fs.promises.rm(secretDir, {
+      force: true,
+      recursive: true,
+    });
+  });
+  test('adding a directory with subdirectories and files', async () => {
+    const secretDir = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'secret-directory-'),
+    );
+    const secretDirName = path.basename(secretDir);
+    await fs.promises.mkdir(path.join(secretDir, 'dir1'));
+    await fs.promises.mkdir(path.join(secretDir, 'dir1', 'dir2'));
+    await fs.promises.mkdir(path.join(secretDir, 'dir3'));
 
-  //     await vault.addSecret('.hiddenSecret', Buffer.from('hidden_contents'));
-  //     await vault.mkdir('.hiddenDir', { recursive: true });
-  //     await vault.addSecret(
-  //       '.hiddenDir/.hiddenInSecret',
-  //       Buffer.from('hidden_inside'),
-  //     );
+    await fs.promises.writeFile(path.join(secretDir, 'secret1'), 'secret1');
+    await fs.promises.writeFile(
+      path.join(secretDir, 'dir1', 'secret2'),
+      'secret2',
+    );
+    await fs.promises.writeFile(
+      path.join(secretDir, 'dir1', 'dir2', 'secret3'),
+      'secret3',
+    );
+    await fs.promises.writeFile(
+      path.join(secretDir, 'dir3', 'secret4'),
+      'secret4',
+    );
+    await fs.promises.writeFile(
+      path.join(secretDir, 'dir3', 'secret5'),
+      'secret5',
+    );
 
-  //     const list = await vault.listSecrets();
-  //     expect(list.sort()).toStrictEqual(
-  //       ['.hiddenSecret', '.hiddenDir/.hiddenInSecret'].sort(),
-  //     );
-  //   } finally {
-  //     await vault.destroy();
-  //   }
-  // });
-  // test('updating and deleting hidden files and directories', async () => {
-  //   try {
-  //     await vault.create();
-  //     await vault.initializeVault();
+    await vault.start();
+    await vault.addSecretDirectory(path.join(secretDir));
 
-  //     await vault.addSecret('.hiddenSecret', Buffer.from('hidden_contents'));
-  //     await vault.mkdir('.hiddenDir', { recursive: true });
-  //     await vault.addSecret(
-  //       '.hiddenDir/.hiddenInSecret',
-  //       Buffer.from('hidden_inside'),
-  //     );
+    const list = await vault.listSecrets();
+    expect(list.sort()).toStrictEqual(
+      [
+        path.join(secretDirName, 'secret1'),
+        path.join(secretDirName, 'dir1', 'secret2'),
+        path.join(secretDirName, 'dir1', 'dir2', 'secret3'),
+        path.join(secretDirName, 'dir3', 'secret4'),
+        path.join(secretDirName, 'dir3', 'secret5'),
+      ].sort(),
+    );
+    await vault.stop();
+    await fs.promises.rm(secretDir, {
+      force: true,
+      recursive: true,
+    });
+  });
+  test('testing the errors handling of adding secret directories', async () => {
+    const secretDir = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'secret-directory-'),
+    );
+    const secretDirName = path.basename(secretDir);
+    await fs.promises.mkdir(path.join(secretDir, 'dir1'));
+    await fs.promises.mkdir(path.join(secretDir, 'dir1', 'dir2'));
+    await fs.promises.mkdir(path.join(secretDir, 'dir3'));
 
-  //     await vault.updateSecret('.hiddenSecret', Buffer.from('change_contents'));
-  //     await vault.updateSecret(
-  //       '.hiddenDir/.hiddenInSecret',
-  //       Buffer.from('change_inside'),
-  //     );
+    await fs.promises.writeFile(path.join(secretDir, 'secret1'), 'secret1');
+    await fs.promises.writeFile(
+      path.join(secretDir, 'dir1', 'secret2'),
+      'secret2',
+    );
+    await fs.promises.writeFile(
+      path.join(secretDir, 'dir1', 'dir2', 'secret3'),
+      'secret3',
+    );
+    await fs.promises.writeFile(
+      path.join(secretDir, 'dir3', 'secret4'),
+      'secret4',
+    );
+    await fs.promises.writeFile(
+      path.join(secretDir, 'dir3', 'secret5'),
+      'secret5',
+    );
 
-  //     await vault.renameSecret('.hiddenSecret', '.hidingSecret');
-  //     await vault.renameSecret('.hiddenDir', '.hidingDir');
+    await vault.start();
+    await vault.mkdir(secretDirName, { recursive: true });
+    await vault.addSecret(
+      path.join(secretDirName, 'secret1'),
+      'blocking-secret',
+    );
+    await vault.addSecretDirectory(secretDir);
 
-  //     let list = await vault.listSecrets();
-  //     expect(list.sort()).toStrictEqual(
-  //       ['.hidingSecret', '.hidingDir/.hiddenInSecret'].sort(),
-  //     );
+    const list = await vault.listSecrets();
+    expect(list.sort()).toStrictEqual(
+      [
+        path.join(secretDirName, 'secret1'),
+        path.join(secretDirName, 'dir1', 'secret2'),
+        path.join(secretDirName, 'dir1', 'dir2', 'secret3'),
+        path.join(secretDirName, 'dir3', 'secret4'),
+        path.join(secretDirName, 'dir3', 'secret5'),
+      ].sort(),
+    );
+    await vault.start();
+    await fs.promises.rm(secretDir, {
+      force: true,
+      recursive: true,
+    });
+  });
+  test('adding a directory of 100 secrets with some secrets already existing', async () => {
+    const secretDir = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'secret-directory-'),
+    );
+    const secretDirName = path.basename(secretDir);
+    for (let i = 0; i < 50; i++) {
+      const name = 'secret ' + i.toString();
+      const content = 'this is secret ' + i.toString();
+      await fs.promises.writeFile(
+        path.join(secretDir, name),
+        Buffer.from(content),
+      );
+    }
+    await vault.start();
+    await vault.mkdir(secretDirName, { recursive: false });
+    await vault.addSecret(path.join(secretDirName, 'secret 8'), 'secret-content');
+    await vault.addSecret(path.join(secretDirName, 'secret 9'), 'secret-content');
+    await vault.addSecretDirectory(secretDir);
 
-  //     await expect(vault.getSecret('.hidingSecret')).resolves.toStrictEqual(
-  //       Buffer.from('change_contents'),
-  //     );
-  //     await expect(
-  //       vault.getSecret('.hidingDir/.hiddenInSecret'),
-  //     ).resolves.toStrictEqual(Buffer.from('change_inside'));
+    for (let j = 0; j < 8; j++) {
+      await expect(
+        fs.promises.readdir(
+          path.join(dataDir, efsId, `${secretDirName}.data`))
+      ).resolves.toContain('secret ' + j.toString() + '.data');
+    }
 
-  //     await vault.deleteSecret('.hidingSecret', true);
-  //     await vault.deleteSecret('.hidingDir', true);
+    await expect(
+      vault.getSecret(path.join(secretDirName, 'secret 8')))
+      .resolves.toStrictEqual('this is secret 8');
+    await expect(
+      vault.getSecret(path.join(secretDirName, 'secret 9')))
+      .resolves.toStrictEqual('this is secret 9');
+    await vault.stop();
+    await fs.promises.rm(secretDir, {
+      force: true,
+      recursive: true,
+    });
+  });
+  test('able to persist data across multiple vault objects', async () => {
+    await vault.start();
+    await vault.addSecret('secret-1', 'secret-content');
 
-  //     list = await vault.listSecrets();
-  //     expect(list.sort()).toStrictEqual([].sort());
-  //   } finally {
-  //     await vault.destroy();
-  //   }
-  // });
-  // test('adding and committing a secret 150 times on vfs', async () => {
-  //   jest.setTimeout(300000);
-  //   const vfs = new VirtualFS();
-  //   const mkdirp = utils.promisify(vfs.mkdirp).bind(vfs);
-  //   const writeFile = utils.promisify(vfs.writeFile).bind(vfs);
-  //   const exists = utils.promisify(vfs.exists).bind(vfs);
-  //   try {
-  //     await vault.create();
-  //     const fileSystem = { promises: vfs.promises };
-  //     if (!fileSystem) {
-  //       throw Error();
-  //     }
-  //     const vaultId = vault.vaultId;
-  //     await mkdirp(path.join(dataDir, vaultId), {
-  //       recursive: true,
-  //     });
-  //     await git.init({
-  //       fs: vfs,
-  //       dir: path.join(dataDir, vaultId),
-  //     });
-  //     await git.commit({
-  //       fs: vfs,
-  //       dir: path.join(dataDir, vaultId),
-  //       author: {
-  //         name: vaultId,
-  //       },
-  //       message: 'Initial Commit',
-  //     });
-  //     await writeFile(
-  //       path.join(path.join(dataDir, vaultId), '.git', 'packed-refs'),
-  //       '# pack-refs with: peeled fully-peeled sorted',
-  //     );
-  //     for (let i = 0; i < 150; i++) {
-  //       const name = 'secret ' + i.toString();
-  //       const content = await getRandomBytes(5);
-  //       const writePath = path.join(dataDir, vaultId, name);
-  //       await writeFile(writePath, content, {});
-  //       await git.add({
-  //         fs: vfs,
-  //         dir: path.join(dataDir, vaultId),
-  //         filepath: name,
-  //       });
-  //       await git.commit({
-  //         fs: vfs,
-  //         dir: path.join(dataDir, vaultId),
-  //         author: {
-  //           name: vaultId,
-  //         },
-  //         message: `Add secret: ${name}`,
-  //       });
-  //       await expect(exists(path.join(dataDir, vaultId))).rejects.toBe(true);
-  //     }
-  //   } finally {
-  //     await vault.destroy();
-  //   }
-  // });
-  // test('adding and committing a secret 150 times on efs', async () => {
-  //   jest.setTimeout(300000);
-  //   const efs = vault.EncryptedFS;
-  //   const exists = utils.promisify(efs.exists).bind(efs);
-  //   const mkdir = utils.promisify(efs.mkdir).bind(efs);
-  //   const writeFile = utils.promisify(efs.writeFile).bind(efs);
-  //   try {
-  //     await vault.create();
-  //     const fileSystem = efs;
-  //     if (!fileSystem) {
-  //       throw Error();
-  //     }
-  //     const vaultId = vault.vaultId;
-  //     await mkdir(path.join(dataDir, vaultId), {
-  //       recursive: true,
-  //     });
-  //     await git.init({
-  //       fs: efs,
-  //       dir: path.join(dataDir, vaultId),
-  //     });
-  //     await git.commit({
-  //       fs: efs,
-  //       dir: path.join(dataDir, vaultId),
-  //       author: {
-  //         name: vaultId,
-  //       },
-  //       message: 'Initial Commit',
-  //     });
-  //     await writeFile(
-  //       path.join(path.join(dataDir, vaultId), '.git', 'packed-refs'),
-  //       '# pack-refs with: peeled fully-peeled sorted',
-  //     );
-  //     for (let i = 0; i < 150; i++) {
-  //       const name = 'secret ' + i.toString();
-  //       const content = await getRandomBytes(5);
-  //       const writePath = path.join(dataDir, vaultId, name);
-  //       await writeFile(writePath, content, {});
-  //       await git.add({
-  //         fs: efs,
-  //         dir: path.join(dataDir, vaultId),
-  //         filepath: name,
-  //       });
-  //       await git.commit({
-  //         fs: efs,
-  //         dir: path.join(dataDir, vaultId),
-  //         author: {
-  //           name: vaultId,
-  //         },
-  //         message: `Add secret: ${name}`,
-  //       });
+    await expect(fs.promises.readdir(path.join(dataDir, efsId))).resolves.toContain(
+      'secret-1.data',
+    );
 
-  //       await expect(exists(path.join(dataDir, vaultId, name))).resolves.toBe(
-  //         true,
-  //       );
-  //     }
-  //   } finally {
-  //     await vault.destroy();
-  //   }
-  // });
-  // test('adding a directory of 1 secret', async () => {
-  //   const secretDir = await fs.promises.mkdtemp(
-  //     path.join(os.tmpdir(), 'secret-directory-'),
-  //   );
-  //   const secretDirName = path.basename(secretDir);
-  //   const exists = utils
-  //     .promisify(vault.EncryptedFS.exists)
-  //     .bind(vault.EncryptedFS);
-  //   try {
-  //     const name = 'secret';
-  //     const content = await getRandomBytes(5);
-  //     await fs.promises.writeFile(path.join(secretDir, name), content);
-  //     await vault.create();
-  //     await vault.initializeVault();
-  //     await vault.addSecretDirectory(path.join(secretDir));
+    const vault2 = new Vault({
+      vaultId: id,
+      vaultName: name,
+      key: key,
+      baseDir: dataDir,
+      logger: logger,
+    });
 
-  //     await expect(
-  //       exists(path.join(vault.vaultId, secretDirName, 'secret')),
-  //     ).resolves.toBe(true);
-  //   } finally {
-  //     await vault.destroy();
-  //     await fs.promises.rm(secretDir, {
-  //       force: true,
-  //       recursive: true,
-  //     });
-  //   }
-  // });
-  // test('adding a directory with subdirectories and files', async () => {
-  //   const secretDir = await fs.promises.mkdtemp(
-  //     path.join(os.tmpdir(), 'secret-directory-'),
-  //   );
-  //   const secretDirName = path.basename(secretDir);
-  //   await fs.promises.mkdir(path.join(secretDir, 'dir1'));
-  //   await fs.promises.mkdir(path.join(secretDir, 'dir1', 'dir2'));
-  //   await fs.promises.mkdir(path.join(secretDir, 'dir3'));
-
-  //   await fs.promises.writeFile(path.join(secretDir, 'secret1'), 'secret1');
-  //   await fs.promises.writeFile(
-  //     path.join(secretDir, 'dir1', 'secret2'),
-  //     'secret2',
-  //   );
-  //   await fs.promises.writeFile(
-  //     path.join(secretDir, 'dir1', 'dir2', 'secret3'),
-  //     'secret3',
-  //   );
-  //   await fs.promises.writeFile(
-  //     path.join(secretDir, 'dir3', 'secret4'),
-  //     'secret4',
-  //   );
-  //   await fs.promises.writeFile(
-  //     path.join(secretDir, 'dir3', 'secret5'),
-  //     'secret5',
-  //   );
-
-  //   try {
-  //     await vault.create();
-  //     await vault.initializeVault();
-  //     await vault.addSecretDirectory(path.join(secretDir));
-
-  //     const list = await vault.listSecrets();
-  //     expect(list.sort()).toStrictEqual(
-  //       [
-  //         path.join(secretDirName, 'secret1'),
-  //         path.join(secretDirName, 'dir1', 'secret2'),
-  //         path.join(secretDirName, 'dir1', 'dir2', 'secret3'),
-  //         path.join(secretDirName, 'dir3', 'secret4'),
-  //         path.join(secretDirName, 'dir3', 'secret5'),
-  //       ].sort(),
-  //     );
-  //   } finally {
-  //     await vault.destroy();
-  //     await fs.promises.rm(secretDir, {
-  //       force: true,
-  //       recursive: true,
-  //     });
-  //   }
-  // });
-  // test('testing the errors handling of adding secret directories', async () => {
-  //   const secretDir = await fs.promises.mkdtemp(
-  //     path.join(os.tmpdir(), 'secret-directory-'),
-  //   );
-  //   const secretDirName = path.basename(secretDir);
-  //   await fs.promises.mkdir(path.join(secretDir, 'dir1'));
-  //   await fs.promises.mkdir(path.join(secretDir, 'dir1', 'dir2'));
-  //   await fs.promises.mkdir(path.join(secretDir, 'dir3'));
-
-  //   await fs.promises.writeFile(path.join(secretDir, 'secret1'), 'secret1');
-  //   await fs.promises.writeFile(
-  //     path.join(secretDir, 'dir1', 'secret2'),
-  //     'secret2',
-  //   );
-  //   await fs.promises.writeFile(
-  //     path.join(secretDir, 'dir1', 'dir2', 'secret3'),
-  //     'secret3',
-  //   );
-  //   await fs.promises.writeFile(
-  //     path.join(secretDir, 'dir3', 'secret4'),
-  //     'secret4',
-  //   );
-  //   await fs.promises.writeFile(
-  //     path.join(secretDir, 'dir3', 'secret5'),
-  //     'secret5',
-  //   );
-
-  //   try {
-  //     await vault.create();
-  //     await vault.initializeVault();
-  //     await vault.mkdir(secretDirName, { recursive: true });
-  //     await vault.addSecret(
-  //       path.join(secretDirName, 'secret1'),
-  //       Buffer.from('blocking-secret'),
-  //     );
-  //     await vault.addSecretDirectory(secretDir);
-
-  //     const list = await vault.listSecrets();
-  //     expect(list.sort()).toStrictEqual(
-  //       [
-  //         path.join(secretDirName, 'secret1'),
-  //         path.join(secretDirName, 'dir1', 'secret2'),
-  //         path.join(secretDirName, 'dir1', 'dir2', 'secret3'),
-  //         path.join(secretDirName, 'dir3', 'secret4'),
-  //         path.join(secretDirName, 'dir3', 'secret5'),
-  //       ].sort(),
-  //     );
-  //   } finally {
-  //     await vault.destroy();
-  //     await fs.promises.rm(secretDir, {
-  //       force: true,
-  //       recursive: true,
-  //     });
-  //   }
-  // });
-  // test('a directory of 100 secrets', async () => {
-  //   jest.setTimeout(300000);
-  //   const readFile = utils
-  //     .promisify(vault.EncryptedFS.readFile)
-  //     .bind(vault.EncryptedFS);
-  //   try {
-  //     await vault.create();
-  //     await vault.initializeVault();
-  //     await vault.addSecret('secret', Buffer.from('content'));
-  //     for (let i = 0; i < 100; i++) {
-  //       await vault.updateSecret(
-  //         'secret',
-  //         Buffer.from('this is secret ' + i.toString()),
-  //       );
-  //       await expect(
-  //         readFile(path.join(vault.vaultId, 'secret'), {
-  //           encoding: 'utf8',
-  //         }),
-  //       ).resolves.toBe('this is secret ' + i.toString());
-  //     }
-  //   } finally {
-  //     vault.destroy();
-  //   }
-  // });
-  // test('adding a directory of 100 secrets with some secrets already existing', async () => {
-  //   jest.setTimeout(300000);
-  //   const secretDir = await fs.promises.mkdtemp(
-  //     path.join(os.tmpdir(), 'secret-directory-'),
-  //   );
-  //   const secretDirName = path.basename(secretDir);
-  //   const exists = utils
-  //     .promisify(vault.EncryptedFS.exists)
-  //     .bind(vault.EncryptedFS);
-  //   const readFile = utils
-  //     .promisify(vault.EncryptedFS.readFile)
-  //     .bind(vault.EncryptedFS);
-  //   try {
-  //     for (let i = 0; i < 50; i++) {
-  //       const name = 'secret ' + i.toString();
-  //       const content = 'this is secret ' + i.toString();
-  //       await fs.promises.writeFile(
-  //         path.join(secretDir, name),
-  //         Buffer.from(content),
-  //       );
-  //     }
-  //     await vault.create();
-  //     await vault.initializeVault();
-  //     await vault.addSecret('secret 8', await getRandomBytes(5));
-  //     await vault.addSecret('secret 9', await getRandomBytes(5));
-  //     await vault.addSecretDirectory(path.join(secretDir));
-
-  //     for (let j = 0; j < 8; j++) {
-  //       await expect(
-  //         exists(
-  //           path.join(vault.vaultId, secretDirName, 'secret ' + j.toString()),
-  //         ),
-  //       ).resolves.toBe(true);
-  //     }
-
-  //     await expect(
-  //       readFile(path.join(vault.vaultId, secretDirName, 'secret 8')),
-  //     ).resolves.toStrictEqual(Buffer.from('this is secret 8'));
-  //     await expect(
-  //       readFile(path.join(vault.vaultId, secretDirName, 'secret 9')),
-  //     ).resolves.toStrictEqual(Buffer.from('this is secret 9'));
-  //   } finally {
-  //     await vault.destroy();
-  //     await fs.promises.rm(secretDir, {
-  //       force: true,
-  //       recursive: true,
-  //     });
-  //   }
-  // });
-  // test('able to persist data across multiple vault objects', async () => {
-  //   const exists = utils
-  //     .promisify(vault.EncryptedFS.exists)
-  //     .bind(vault.EncryptedFS);
-  //   try {
-  //     await vault.create();
-  //     await vault.initializeVault();
-  //     await vault.addSecret('secret-1', Buffer.from('secret-content'));
-
-  //     await expect(exists(path.join(vault.vaultId, 'secret-1'))).resolves.toBe(
-  //       true,
-  //     );
-
-  //     const vault2 = new Vault({
-  //       vaultId: id,
-  //       vaultName: name,
-  //       key: key,
-  //       baseDir: dataDir,
-  //       logger: logger,
-  //     });
-
-  //     const content = await vault2.getSecret('secret-1');
-  //     expect(content.toString()).toBe('secret-content');
-  //   } finally {
-  //     await vault.destroy();
-  //   }
-  // });
+    const content = await vault2.getSecret('secret-1');
+    expect(content.toString()).toBe('secret-content');
+    await vault.stop();
+  });
   // test('able to encrypt and decrypt using workers - read/write', async () => {
-  //   await vault.create();
-  //   await vault.initializeVault();
+  //   await vault.start();
   //   const workerManager = new WorkerManager({ logger });
   //   await workerManager.start();
   //   const plainBuf = Buffer.from('very important secret');
