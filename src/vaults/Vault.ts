@@ -1,3 +1,4 @@
+import type { FileSystem } from '../types';
 import type { FileChanges } from './types';
 import type { WorkerManager } from '../workers';
 
@@ -17,7 +18,7 @@ class Vault {
   public readonly vaultId: string;
 
   public vaultName: string;
-  protected filesystem: typeof fs;
+  protected fs: FileSystem;
   protected efs: EncryptedFS;
   protected lock: Mutex = new Mutex();
   protected logger: Logger;
@@ -28,19 +29,19 @@ class Vault {
     vaultId,
     vaultName,
     baseDir,
-    filesystem,
+    fs,
     logger,
   }: {
     vaultId: string;
     vaultName: string;
     baseDir: string;
-    filesystem: typeof fs;
+    fs: FileSystem;
     logger?: Logger;
   }) {
     this.vaultId = vaultId;
     this.vaultName = vaultName;
     this.baseDir = baseDir;
-    this.filesystem = filesystem;
+    this.fs = fs;
     this.logger = logger ?? new Logger(this.constructor.name);
     this._started = false;
   }
@@ -129,7 +130,7 @@ class Vault {
    * @returns the stats of the vault directory
    */
   public async stats(): Promise<fs.Stats> {
-    return await this.filesystem.promises.stat(this.baseDir);
+    return await this.fs.promises.stat(this.baseDir);
   }
 
   /**
@@ -334,7 +335,7 @@ class Vault {
    */
   public async deleteSecret(
     secretName: string,
-    { recursive }: { recursive: boolean },
+    { recursive = false }: { recursive?: boolean },
   ): Promise<boolean> {
     const release = await this.lock.acquire();
     const stat = utils.promisify(this.efs.stat).bind(this.efs);
@@ -407,7 +408,7 @@ class Vault {
    */
   public async mkdir(
     dirPath: string,
-    { recursive }: { recursive: boolean },
+    { recursive = false }: { recursive?: boolean },
   ): Promise<boolean> {
     const release = await this.lock.acquire();
     const mkdir = utils.promisify(this.efs.mkdir).bind(this.efs);

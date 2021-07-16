@@ -33,7 +33,7 @@ describe('Vault is', () => {
       vaultId: vaultId,
       vaultName: name,
       baseDir: efsDir,
-      filesystem: fs,
+      fs: fs,
       logger: logger,
     });
   });
@@ -513,7 +513,7 @@ describe('Vault is', () => {
       vaultId: vaultId,
       vaultName: name,
       baseDir: efsDir,
-      filesystem: fs,
+      fs: fs,
       logger: logger,
     });
     await vault2.start({ key });

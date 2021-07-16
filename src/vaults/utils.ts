@@ -5,7 +5,7 @@ import type { FileSystem } from '../types';
 import fs from 'fs';
 import path from 'path';
 import base58 from 'bs58';
-import uuid from 'uuid';
+import { v4 as uuid } from 'uuid';
 import * as keysUtils from '../keys/utils';
 import * as utils from '../utils';
 
@@ -14,10 +14,10 @@ async function generateVaultKey(bits: number = 256) {
 }
 
 async function generateVaultId(): Promise<VaultId> {
-  // const id = uuid.v4();
-  // return id as VaultId;
-  const id = await keysUtils.getRandomBytes(32);
-  return base58.encode(id) as VaultId;
+  const vaultId = uuid();
+  return vaultId as VaultId;
+  // const id = await keysUtils.getRandomBytes(32);
+  // return base58.encode(id) as VaultId;
 }
 
 async function fileExists(fs: FileSystem, path): Promise<boolean> {

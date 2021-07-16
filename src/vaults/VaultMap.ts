@@ -3,6 +3,7 @@ import type { DBLevel, DBOp } from '../db/types';
 import type { VaultId, Vaults } from './types';
 import type { KeyManager } from '../keys';
 
+import fs from 'fs';
 import { Mutex } from 'async-mutex';
 import Logger from '@matrixai/logger';
 
@@ -314,8 +315,9 @@ class VaultMap {
           vault: new Vault({
             vaultId: id,
             vaultName: name,
-            key: Buffer.from(vaultKey),
+            // key: Buffer.from(vaultKey),
             baseDir: this.vaultMapPath,
+            fs: fs,
             logger: this.logger,
           }),
           vaultName: name,

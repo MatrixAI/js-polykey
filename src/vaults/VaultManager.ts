@@ -88,8 +88,9 @@ class VaultManager {
     });
   }
 
+  // TODO: Add in node manager started in here
   get started(): boolean {
-    if (this._started && this.keyManager.started && this.gitFrontend) {
+    if (this._started && this.keyManager.started) {
       return true;
     }
     return false;
@@ -121,11 +122,14 @@ class VaultManager {
         recursive: true,
       });
     }
-
     await utils.mkdirExists(this.fs, this.vaultsPath, { recursive: true });
+
     await this.vaultMap.start();
     await this.loadVaultData();
-
+    for (const vaultId in this.vaults) {
+      let key = this.vaults[vaultId].vaultKey;
+      this.vaults[vaultId].vault.start({ key });
+    }
     this._started = true;
   }
 
@@ -147,6 +151,7 @@ class VaultManager {
    * @returns The newly created vault object
    */
   public async createVault(vaultName: string): Promise<Vault> {
+    // Generate a VaultId
     let vaultId = await generateVaultId();
     const i = 0;
     while (this.vaults[vaultId]) {
@@ -157,24 +162,64 @@ class VaultManager {
       }
       vaultId = await generateVaultId();
     }
-    const key = await generateVaultKey();
 
-    await this.vaultMap.setVault(vaultName, vaultId as VaultId, key);
-
+    // Create the Vault instance and path
     await this.fs.promises.mkdir(path.join(this.vaultsPath, vaultId));
-
     const vault = new Vault({
       vaultId: vaultId,
       vaultName: vaultName,
       baseDir: path.join(this.vaultsPath, vaultId),
+      fs: fs,
       logger: this.logger,
     });
 
+    // Generate the key and store the vault in memory and on disk
+    const key = await generateVaultKey();
+    await this.vaultMap.setVault(vaultName, vaultId as VaultId, key);
     await vault.start({ key: key });
-
     this.vaults[vaultId] = { vault: vault, vaultKey: key, vaultName: vaultName };
 
     return vault;
+  }
+
+  /**
+   * Retreieves the Vault instance
+   *
+   * @throws ErrorVaultUndefined if vaultId does not exist
+   * @param vaultId Id of vault
+   * @returns a vault instance.
+   */
+  public getVault(vaultId: string): Vault {
+    if (!this.vaults[vaultId]) {
+      throw new errors.ErrorVaultUndefined(`${vaultId} does not exist`);
+    } else {
+      return this.vaults[vaultId].vault;
+    }
+  }
+
+  /**
+   * Rename an existing vault. Updates references to vault keys and
+   * writes new encrypted vault metadata to disk.
+   *
+   * @throws ErrorVaultUndefined if vault currVaultName does not exist
+   * @throws ErrorVaultDefined if newVaultName already exists
+   * @param vaultId Id of vault to be renamed
+   * @param newVaultName New name of  vault
+   * @returns true if success
+   */
+  public async renameVault(
+    vaultId: string,
+    newVaultName: string,
+  ): Promise<boolean> {
+    if (!this.vaults[vaultId]) {
+      throw new errors.ErrorVaultUndefined(`${vaultId} does not exist`);
+    }
+    const vault = this.vaults[vaultId].vault;
+    await this.vaultMap.renameVault(vault.vaultName, newVaultName);
+    await vault.renameVault(newVaultName);
+    this.vaults[vaultId].vaultName = newVaultName;
+
+    return true;
   }
 
     /**
@@ -250,36 +295,6 @@ class VaultManager {
     //   ref: 'master',
     //   singleBranch: true,
     // });
-  }
-
-  /**
-   * Rename an existing vault. Updates references to vault keys and
-   * writes new encrypted vault metadata to disk.
-   *
-   * @throws ErrorVaultUndefined if vault currVaultName does not exist
-   * @throws ErrorVaultDefined if newVaultName already exists
-   * @param vaultId Id of vault to be renamed
-   * @param newVaultName New name of  vault
-   * @returns true if success
-   */
-  public async renameVault(
-    vaultId: string,
-    newVaultName: string,
-  ): Promise<boolean> {
-    if (!this.vaults[vaultId]) {
-      throw new errors.ErrorVaultUndefined();
-    }
-
-    const vault = this.vaults[vaultId].vault;
-
-    await this.vaultMap.renameVault(vault.vaultName, newVaultName);
-
-    await vault.renameVault(newVaultName);
-
-    // update vaults
-    this.vaults[vaultId].vaultName = newVaultName;
-
-    return true;
   }
 
   /**
@@ -386,21 +401,6 @@ class VaultManager {
       if (vaultName === this.vaults[id].vaultName) {
         return id;
       }
-    }
-  }
-
-  /**
-   * Retreieves the Vault instance
-   *
-   * @throws ErrorVaultUndefined if vaultId does not exist
-   * @param vaultId Id of vault
-   * @returns a vault instance.
-   */
-  public getVault(vaultId: string): Vault {
-    if (!this.vaults[vaultId]) {
-      throw new errors.ErrorVaultUndefined(`${vaultId} does not exist`);
-    } else {
-      return this.vaults[vaultId].vault;
     }
   }
 
