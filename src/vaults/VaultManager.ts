@@ -86,7 +86,6 @@ class VaultManager {
       vaultMapPath: this.vaultsPath,
       logger: this.logger,
     });
-    this.gitFrontend = new GitFrontend();
   }
 
   get started(): boolean {
@@ -98,15 +97,15 @@ class VaultManager {
 
   public setWorkerManager(workerManager: WorkerManager) {
     this.workerManager = workerManager;
-    for (const id in this.vaults) {
-      this.vaults[id].vault.setWorkerManager(workerManager);
+    for (const vaultId in this.vaults) {
+      this.vaults[vaultId].vault.setWorkerManager(workerManager);
     }
   }
 
   public unsetWorkerManager() {
     delete this.workerManager;
-    for (const id in this.vaults) {
-      this.vaults[id].vault.unsetWorkerManager();
+    for (const vaultId in this.vaults) {
+      this.vaults[vaultId].vault.unsetWorkerManager();
     }
   }
 
@@ -124,9 +123,9 @@ class VaultManager {
     }
 
     await utils.mkdirExists(this.fs, this.vaultsPath, { recursive: true });
-
     await this.vaultMap.start();
     await this.loadVaultData();
+
     this._started = true;
   }
 
