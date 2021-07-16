@@ -29,20 +29,20 @@ service Client {
 
   // Vaults
   rpc VaultsList(EmptyMessage) returns (stream VaultMessage) {};
-  rpc VaultsCreate(VaultMessage) returns (StatusMessage) {};
-  rpc VaultsRename(VaultMessage) returns (StatusMessage) {};
+  rpc VaultsCreate(VaultMessage) returns (VaultMessage) {};
+  rpc VaultsRename(VaultSpecificMessage) returns (VaultMessage) {};
   rpc VaultsDelete(VaultMessage) returns (StatusMessage) {};
   rpc VaultsListSecrets(VaultMessage) returns (stream SecretMessage) {};
-  rpc VaultsMkdir(VaultSpecificMessage) returns (EmptyMessage) {};
+  rpc VaultsMkdir(VaultSpecificMessage) returns (StatusMessage) {};
   rpc VaultsStat(VaultMessage) returns (StatMessage) {};
-  rpc VaultsPull(VaultMessage) returns (EmptyMessage) {};
+  rpc VaultsPull(VaultPullMessage) returns (StatusMessage) {};
   rpc VaultsScan(NodeMessage) returns (stream VaultMessage) {};
-  rpc VaultsDeleteSecret(VaultSpecificMessage) returns (StatusMessage) {};
-  rpc VaultsEditSecret(SecretSpecificMessage) returns (EmptyMessage) {};
-  rpc VaultsGetSecret(VaultSpecificMessage) returns (SecretMessage) {};
+  rpc VaultsDeleteSecret(SecretMessage) returns (StatusMessage) {};
+  rpc VaultsEditSecret(SecretEditMessage) returns (StatusMessage) {};
+  rpc VaultsGetSecret(SecretMessage) returns (SecretMessage) {};
   rpc VaultsRenameSecret(SecretRenameMessage) returns (StatusMessage) {};
-  rpc VaultsNewSecret(SecretNewMessage) returns (StatusMessage) {};
-  rpc VaultsNewDirSecret(SecretNewMessage) returns (EmptyMessage) {};
+  rpc VaultsNewSecret(SecretMessage) returns (StatusMessage) {};
+  rpc VaultsNewDirSecret(SecretSpecificMessage) returns (StatusMessage) {};
   rpc VaultsShare(ShareMessage) returns (EmptyMessage) {};
   rpc VaultsPermissions(ShareMessage) returns (stream PermissionMessage) {};
 
@@ -82,34 +82,41 @@ message JWTTokenMessage {
 // Vaults
 
 message VaultMessage {
-  string name = 1;
-  string id = 2;
+  oneof name_or_id {
+    string name = 1;
+    string id = 2;
+  }
 }
 
 message VaultSpecificMessage {
-  VaultMessage vault = 1;
+  required VaultMessage vault = 1;
   string name = 2;
 }
 
-message SecretSpecificMessage {
-  VaultSpecificMessage vault = 1;
-  string content = 2;
+message VaultPullMessage {
+  required VaultMessage vault = 1;
+  required NodeMessage node = 2;
 }
 
 message SecretRenameMessage {
-  VaultMessage vault = 1;
-  SecretMessage oldName = 2;
-  SecretMessage newName = 3;
+  SecretMessage oldSecret = 1;
+  string newName = 2;
 }
 
-message SecretNewMessage {
+message SecretMessage {
   VaultMessage vault = 1;
   string name = 2;
   string content = 3;
 }
 
-message SecretMessage {
-  string name = 1;
+message SecretEditMessage {
+  SecretMessage secret = 1;
+  string content = 2;
+}
+
+message SecretSpecificMessage {
+  SecretMessage vault = 1;
+  string content = 2;
 }
 
 message StatMessage {
