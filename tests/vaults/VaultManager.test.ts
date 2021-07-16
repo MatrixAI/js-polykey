@@ -23,6 +23,7 @@ describe('VaultManager is', () => {
   let db: DB;
   let acl: ACL;
   let gestaltGraph: GestaltGraph;
+  let vaultManager: VaultManager;
   beforeEach(async () => {
     dataDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'polykey-test-'),
@@ -30,7 +31,8 @@ describe('VaultManager is', () => {
     const keysPath = `${dataDir}/keys`;
     keyManager = new KeyManager({ keysPath, logger });
     await keyManager.start({ password: 'password' });
-    const dbPath = `${dataDir}/db`;
+    const dbPath = path.join(dataDir, 'vaults');
+    const vaultPath = path.join(dataDir, 'vaults');
     db = new DB({ dbPath, logger });
     await db.start({
       keyPair: keyManager.getRootKeyPair(),
@@ -46,6 +48,15 @@ describe('VaultManager is', () => {
       logger: logger,
     });
     await gestaltGraph.start();
+    vaultManager = new VaultManager({
+      vaultsPath: ,
+      keyManager: keyManager,
+      db: db,
+      acl: acl,
+      gestaltGraph: gestaltGraph,
+      fs: fs,
+      logger: logger,
+    });
   });
   afterEach(async () => {
     await gestaltGraph.stop();
@@ -58,15 +69,6 @@ describe('VaultManager is', () => {
     });
   });
   test('type correct', () => {
-    const vaultManager = new VaultManager({
-      vaultsPath: path.join(dataDir, 'vaults'),
-      keyManager: keyManager,
-      db: db,
-      acl: acl,
-      gestaltGraph: gestaltGraph,
-      fs: fs,
-      logger: logger,
-    });
     expect(vaultManager).toBeInstanceOf(VaultManager);
   });
   test('starting and stopping', async () => {

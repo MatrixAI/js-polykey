@@ -18,6 +18,7 @@ import { GitFrontend } from '../git';
 import { GestaltGraph } from '../gestalts';
 import { ACL } from '../acl';
 import { DB } from '../db';
+import { agentPB } from '../agent';
 
 import * as utils from '../utils';
 import * as errors from './errors';
@@ -98,14 +99,14 @@ class VaultManager {
   public setWorkerManager(workerManager: WorkerManager) {
     this.workerManager = workerManager;
     for (const id in this.vaults) {
-      this.vaults[id].vault.EncryptedFS.setWorkerManager(workerManager);
+      this.vaults[id].vault.setWorkerManager(workerManager);
     }
   }
 
   public unsetWorkerManager() {
     delete this.workerManager;
     for (const id in this.vaults) {
-      this.vaults[id].vault.EncryptedFS.unsetWorkerManager();
+      this.vaults[id].vault.unsetWorkerManager();
     }
   }
 
@@ -147,31 +148,32 @@ class VaultManager {
    * @returns The newly created vault object
    */
   public async createVault(vaultName: string): Promise<Vault> {
-    // generate a key
-    let id = await generateVaultId();
+    let vaultId = await generateVaultId();
     const i = 0;
-    while (this.vaults[id]) {
+    while (this.vaults[vaultId]) {
       if (i > 50) {
         throw new errors.ErrorCreateVaultId(
           'Could not create a unique vaultId after 50 attempts',
         );
       }
-      id = await generateVaultId();
+      vaultId = await generateVaultId();
     }
     const key = await generateVaultKey();
 
-    // write vault data
-    await this.vaultMap.setVault(vaultName, id as VaultId, key);
+    await this.vaultMap.setVault(vaultName, vaultId as VaultId, key);
+
+    await this.fs.promises.mkdir(path.join(this.vaultsPath, vaultId));
 
     const vault = new Vault({
-      vaultId: id,
+      vaultId: vaultId,
       vaultName: vaultName,
-      key: key,
-      baseDir: this.vaultsPath,
+      baseDir: path.join(this.vaultsPath, vaultId),
       logger: this.logger,
     });
-    vault.create();
-    this.vaults[id] = { vault: vault, vaultKey: key, vaultName: vaultName };
+
+    await vault.start({ key: key });
+
+    this.vaults[vaultId] = { vault: vault, vaultKey: key, vaultName: vaultName };
 
     return vault;
   }
@@ -241,14 +243,14 @@ class VaultManager {
     }
     const vault = await this.createVault(vaultName);
     this.setLinkVault(vault.vaultId, vaultId);
-    await git.clone({
-      fs: vault.EncryptedFS,
-      http: gitRequest,
-      dir: vault.vaultId,
-      url: vaultUrl,
-      ref: 'master',
-      singleBranch: true,
-    });
+    // await git.clone({
+    //   fs: vault.EncryptedFS,
+    //   http: gitRequest,
+    //   dir: vault.vaultId,
+    //   url: vaultUrl,
+    //   ref: 'master',
+    //   singleBranch: true,
+    // });
   }
 
   /**
@@ -288,10 +290,7 @@ class VaultManager {
    */
   public async vaultStats(vaultId: string): Promise<fs.Stats> {
     const vault = this.vaults[vaultId].vault;
-    const stat = utils
-      .promisify(vault.EncryptedFS.stat)
-      .bind(vault.EncryptedFS);
-    return await stat(vault.vaultId);
+    return await vault.stats();
   }
 
   /**
@@ -313,7 +312,7 @@ class VaultManager {
       // this is convenience function for removing all tags
       // and triggering garbage collection
       // destruction is a better word as we should ensure all traces are removed
-
+      await this.vaults[vaultId].vault.stop();
       const vaultPath = path.join(this.vaultsPath, vaultId);
       // Remove directory on file system
       if (await fileExists(this.fs, vaultPath)) {

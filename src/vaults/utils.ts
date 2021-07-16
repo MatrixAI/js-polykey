@@ -47,12 +47,14 @@ async function* readdirRecursively(dir: string) {
 async function* readdirRecursivelyEFS(fs: EncryptedFS, dir: string) {
   const readdir = utils.promisify(fs.readdir).bind(fs);
   const dirents = await readdir(dir);
+  let secretPath: string;
   for (const dirent of dirents) {
     const res = dirent;
-    if (fs.statSync(path.join(dir, res)).isDirectory() && dirent !== '.git') {
-      yield* readdirRecursivelyEFS(fs, path.join(dir, res));
-    } else if (fs.statSync(path.join(dir, res)).isFile()) {
-      yield path.resolve(dir, res);
+    secretPath = path.join(dir, res);
+    if (fs.statSync(secretPath).isDirectory() && dirent !== '.git') {
+      yield* readdirRecursivelyEFS(fs, secretPath);
+    } else if (fs.statSync(secretPath).isFile()) {
+      yield secretPath;
     }
   }
 }
