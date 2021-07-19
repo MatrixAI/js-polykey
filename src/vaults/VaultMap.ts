@@ -3,6 +3,7 @@ import type { DBLevel, DBOp } from '../db/types';
 import type { VaultId, Vaults } from './types';
 import type { KeyManager } from '../keys';
 
+import path from 'path';
 import fs from 'fs';
 import { Mutex } from 'async-mutex';
 import Logger from '@matrixai/logger';
@@ -130,7 +131,7 @@ class VaultMap {
    * Transaction wrapper that will not lock if the operation was executed
    * within a transaction context
    */
-  protected async _transaction<T>(f: () => Promise<T>): Promise<T> {
+  public async _transaction<T>(f: () => Promise<T>): Promise<T> {
     if (this.lock.isLocked()) {
       return await f();
     } else {
@@ -315,8 +316,7 @@ class VaultMap {
           vault: new Vault({
             vaultId: id,
             vaultName: name,
-            // key: Buffer.from(vaultKey),
-            baseDir: this.vaultMapPath,
+            baseDir: path.join(this.vaultMapPath, id),
             fs: fs,
             logger: this.logger,
           }),

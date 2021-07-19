@@ -151,315 +151,179 @@ describe('VaultManager is', () => {
     );
     await vaultManager.stop();
   });
-  // test('able to delete a vault', async () => {
-  //   const vaultManager = new VaultManager({
-  //     vaultsPath: path.join(dataDir, 'vaults'),
-  //     keyManager: keyManager,
-  //     db: db,
-  //     acl: acl,
-  //     gestaltGraph: gestaltGraph,
-  //     fs: fs,
-  //     logger: logger,
-  //   });
+  test('able to delete a vault', async () => {
+    await vaultManager.start({});
+    const firstVault = await vaultManager.createVault('MyFirstVault');
+    const secondVault = await vaultManager.createVault('MySecondVault');
+    const thirdVault = await vaultManager.createVault('MyThirdVault');
+    const result = await vaultManager.deleteVault(secondVault.vaultId);
+    expect(result).toBe(true);
+    expect(vaultManager.getVault(firstVault.vaultId)).toBe(firstVault);
+    expect(() => {
+      vaultManager.getVault(secondVault.vaultId);
+    }).toThrow(`${secondVault.vaultId} does not exist`);
+    expect(vaultManager.getVault(thirdVault.vaultId)).toBe(thirdVault);
+    await vaultManager.stop();
+  });
+  test('able to list vaults', async () => {
+    await vaultManager.start({});
+    await vaultManager.createVault('MyTestVault');
+    await vaultManager.createVault('MyOtherTestVault');
+    const vn: Array<string> = [];
+    vaultManager.listVaults().forEach((a) => vn.push(a.name));
+    expect(vn.sort()).toEqual(['MyTestVault', 'MyOtherTestVault'].sort());
+    await vaultManager.stop();
+  });
+  test('able to get vault stats', async () => {
+    await vaultManager.start({});
+    const vault1 = await vaultManager.createVault('MyTestVault');
+    const vault2 = await vaultManager.createVault('MyOtherTestVault');
+    const stat1 = await vaultManager.vaultStats(vault1.vaultId);
+    const stat2 = await vaultManager.vaultStats(vault2.vaultId);
+    expect(stat1).toBeInstanceOf(fs.Stats);
+    expect(stat2).toBeInstanceOf(fs.Stats);
+    expect(stat1.ctime < stat2.ctime).toBeTruthy();
+    await vaultManager.stop();
+  });
+  test('able to create many vaults', async () => {
+    const vaultNames = [
+      'Vault1',
+      'Vault2',
+      'Vault3',
+      'Vault4',
+      'Vault5',
+      'Vault6',
+      'Vault7',
+      'Vault8',
+      'Vault9',
+      'Vault10',
+      'Vault11',
+      'Vault12',
+      'Vault13',
+      'Vault14',
+      'Vault15',
+      'Vault16',
+      'Vault17',
+      'Vault18',
+      'Vault19',
+      'Vault20',
+    ];
+    await vaultManager.start({});
+    for (const vaultName of vaultNames) {
+      await vaultManager.createVault(vaultName);
+    }
+    expect(vaultManager.listVaults().length).toEqual(vaultNames.length);
+    await vaultManager.stop();
+  });
+  test('able to read and load existing metadata', async () => {
+    const vaultNames = [
+      'Vault1',
+      'Vault2',
+      'Vault3',
+      'Vault4',
+      'Vault5',
+      'Vault6',
+      'Vault7',
+      'Vault8',
+      'Vault9',
+      'Vault10',
+    ];
+    await vaultManager.start({});
+    for (const vaultName of vaultNames) {
+      await vaultManager.createVault(vaultName);
+    }
+    const vaults = vaultManager.listVaults();
+    let vaultId: string = '';
+    for (const v of vaults) {
+      if (v.name === 'Vault1') {
+        vaultId = v.id;
+        break;
+      }
+    }
+    expect(vaultId).not.toBeUndefined();
+    const vault = vaultManager.getVault(vaultId);
+    expect(vault).toBeTruthy();
+    await vaultManager.stop();
+    await gestaltGraph.stop();
+    await acl.stop();
+    await db.stop();
 
-  //   await vaultManager.start({});
+    await db.start({
+      keyPair: keyManager.getRootKeyPair(),
+    });
+    await acl.start();
+    await gestaltGraph.start();
+    await vaultManager.start({});
+    const vn: Array<string> = [];
+    vaultManager.listVaults().forEach((a) => vn.push(a.name));
+    expect(vn.sort()).toEqual(vaultNames.sort());
+    await vaultManager.stop();
+  });
+  test('able to recover metadata after complex operations', async () => {
+    const vaultNames = [
+      'Vault1',
+      'Vault2',
+      'Vault3',
+      'Vault4',
+      'Vault5',
+      'Vault6',
+      'Vault7',
+      'Vault8',
+      'Vault9',
+      'Vault10',
+    ];
+    const alteredVaultNames = [
+      'Vault1',
+      'Vault2',
+      'Vault3',
+      'Vault4',
+      'Vault6',
+      'Vault7',
+      'Vault8',
+      'Vault10',
+      'ThirdImpact',
+      'Cake',
+    ];
+    await vaultManager.start({});
+    for (const vaultName of vaultNames) {
+      await vaultManager.createVault(vaultName);
+    }
+    const v10 = vaultManager.getVaultId('Vault10');
+    expect(v10).toBeTruthy();
+    await vaultManager.deleteVault(v10!);
+    const v5 = vaultManager.getVaultId('Vault5');
+    expect(v5).toBeTruthy();
+    await vaultManager.deleteVault(v5!);
+    const v9 = vaultManager.getVaultId('Vault9');
+    expect(v9).toBeTruthy();
+    const vault9 = vaultManager.getVault(v9!);
+    await vaultManager.renameVault(v9!, 'Vault10');
+    await vaultManager.createVault('ThirdImpact');
+    await vaultManager.createVault('Cake');
+    await vault9.addSecret('MySecret', 'MyActualPassword');
+    const vn: Array<string> = [];
+    vaultManager.listVaults().forEach((a) => vn.push(a.name));
+    expect(vn.sort()).toEqual(alteredVaultNames.sort());
+    await vaultManager.stop();
+    await gestaltGraph.stop();
+    await acl.stop();
+    await db.stop();
 
-  //   const firstVault = await vaultManager.createVault('MyFirstVault');
-  //   const secondVault = await vaultManager.createVault('MySecondVault');
-  //   const thirdVault = await vaultManager.createVault('MyThirdVault');
-  //   const result = await vaultManager.deleteVault(secondVault.vaultId);
-
-  //   expect(result).toBe(true);
-  //   expect(vaultManager.getVault(firstVault.vaultId)).toBe(firstVault);
-  //   expect(() => {
-  //     vaultManager.getVault(secondVault.vaultId);
-  //   }).toThrow(`${secondVault.vaultId} does not exist`);
-  //   expect(vaultManager.getVault(thirdVault.vaultId)).toBe(thirdVault);
-
-  //   await vaultManager.stop();
-  // });
-  // test('able to list vaults', async () => {
-  //   const vaultManager = new VaultManager({
-  //     vaultsPath: path.join(dataDir, 'vaults'),
-  //     keyManager: keyManager,
-  //     db: db,
-  //     acl: acl,
-  //     gestaltGraph: gestaltGraph,
-  //     fs: fs,
-  //     logger: logger,
-  //   });
-
-  //   await vaultManager.start({});
-
-  //   await vaultManager.createVault('MyTestVault');
-  //   await vaultManager.createVault('MyOtherTestVault');
-
-  //   const vn: Array<string> = [];
-  //   vaultManager.listVaults().forEach((a) => vn.push(a.name));
-  //   expect(vn.sort()).toEqual(['MyTestVault', 'MyOtherTestVault'].sort());
-
-  //   await vaultManager.stop();
-  // });
-  // test('able to get vault stats', async () => {
-  //   const vaultManager = new VaultManager({
-  //     vaultsPath: path.join(dataDir, 'vaults'),
-  //     keyManager: keyManager,
-  //     db: db,
-  //     acl: acl,
-  //     gestaltGraph: gestaltGraph,
-  //     fs: fs,
-  //     logger: logger,
-  //   });
-
-  //   await vaultManager.start({});
-
-  //   const vault1 = await vaultManager.createVault('MyTestVault');
-  //   const vault2 = await vaultManager.createVault('MyOtherTestVault');
-
-  //   const stat1 = await vaultManager.vaultStats(vault1.vaultId);
-  //   const stat2 = await vaultManager.vaultStats(vault2.vaultId);
-
-  //   expect(stat1.ctime < stat2.ctime).toBeTruthy();
-
-  //   await vaultManager.stop();
-  // });
-  // test('able to create many vaults', async () => {
-  //   const vaultManager = new VaultManager({
-  //     vaultsPath: path.join(dataDir, 'vaults'),
-  //     keyManager: keyManager,
-  //     db: db,
-  //     acl: acl,
-  //     gestaltGraph: gestaltGraph,
-  //     fs: fs,
-  //     logger: logger,
-  //   });
-
-  //   const vaultNames = [
-  //     'Vault1',
-  //     'Vault2',
-  //     'Vault3',
-  //     'Vault4',
-  //     'Vault5',
-  //     'Vault6',
-  //     'Vault7',
-  //     'Vault8',
-  //     'Vault9',
-  //     'Vault10',
-  //     'Vault11',
-  //     'Vault12',
-  //     'Vault13',
-  //     'Vault14',
-  //     'Vault15',
-  //     'Vault16',
-  //     'Vault17',
-  //     'Vault18',
-  //     'Vault19',
-  //     'Vault20',
-  //   ];
-
-  //   await vaultManager.start({});
-  //   for (const vaultName of vaultNames) {
-  //     await vaultManager.createVault(vaultName);
-  //   }
-
-  //   expect(vaultManager.listVaults().length).toEqual(vaultNames.length);
-
-  //   await vaultManager.stop();
-  // });
-  // test('able to write metadata', async () => {
-  //   const vaultManager = new VaultManager({
-  //     vaultsPath: path.join(dataDir, 'vaults'),
-  //     keyManager: keyManager,
-  //     db: db,
-  //     acl: acl,
-  //     gestaltGraph: gestaltGraph,
-  //     fs: fs,
-  //     logger: logger,
-  //   });
-
-  //   await vaultManager.start({});
-
-  //   await vaultManager.createVault('MyVault');
-
-  //   await vaultManager.stop();
-
-  //   const leveldb = await level(vaultManager.vaultsPath);
-  //   await leveldb.open();
-  //   leveldb.createReadStream().on('data', (data) => {
-  //     expect(data).toBeTruthy();
-  //   });
-  //   await leveldb.close();
-  // });
-  // test('able to read and load existing metadata', async () => {
-  //   const vaultManager = new VaultManager({
-  //     vaultsPath: path.join(dataDir, 'vaults'),
-  //     keyManager: keyManager,
-  //     db: db,
-  //     acl: acl,
-  //     gestaltGraph: gestaltGraph,
-  //     fs: fs,
-  //     logger: logger,
-  //   });
-
-  //   const vaultNames = [
-  //     'Vault1',
-  //     'Vault2',
-  //     'Vault3',
-  //     'Vault4',
-  //     'Vault5',
-  //     'Vault6',
-  //     'Vault7',
-  //     'Vault8',
-  //     'Vault9',
-  //     'Vault10',
-  //   ];
-
-  //   await vaultManager.start({});
-
-  //   for (const vaultName of vaultNames) {
-  //     await vaultManager.createVault(vaultName);
-  //   }
-  //   const vaults = vaultManager.listVaults();
-  //   let vaultId: string = '';
-  //   for (const v of vaults) {
-  //     if (v.name === 'Vault1') {
-  //       vaultId = v.id;
-  //       break;
-  //     }
-  //   }
-  //   expect(vaultId).not.toBe('');
-
-  //   const vault = vaultManager.getVault(vaultId);
-  //   const id = vault.vaultId;
-  //   await vaultManager.setLinkVault(id, '12345667889');
-  //   expect(vault).toBeTruthy();
-  //   // vault = vaultManager.getVault('Vault1');
-
-  //   await vaultManager.stop();
-  //   await gestaltGraph.stop();
-  //   await acl.stop();
-  //   await db.stop();
-
-  //   await db.start({
-  //     keyPair: keyManager.getRootKeyPair(),
-  //   });
-  //   await acl.start();
-  //   await gestaltGraph.start();
-  //   await vaultManager.start({});
-
-  //   const vaults2 = vaultManager.listVaults();
-  //   let vaultId2: string = '';
-  //   for (const v of vaults2) {
-  //     if (v.name === 'Vault1') {
-  //       vaultId2 = v.id;
-  //       break;
-  //     }
-  //   }
-  //   // implicit test of keys
-  //   expect(vault.EncryptedFS.Stats).toEqual(
-  //     vaultManager.getVault(vaultId2).EncryptedFS.Stats,
-  //   );
-  //   const vn: Array<string> = [];
-  //   vaultManager.listVaults().forEach((a) => vn.push(a.name));
-  //   expect(vn.sort()).toEqual(vaultNames.sort());
-
-  //   expect(vaultManager.getLinkVault('12345667889')?.vaultId).toBe(id);
-
-  //   await vaultManager.stop();
-  //   await gestaltGraph.stop();
-  //   await acl.stop();
-  //   await db.stop();
-  // });
-  // test('able to recover metadata after complex operations', async () => {
-  //   const vaultNames = [
-  //     'Vault1',
-  //     'Vault2',
-  //     'Vault3',
-  //     'Vault4',
-  //     'Vault5',
-  //     'Vault6',
-  //     'Vault7',
-  //     'Vault8',
-  //     'Vault9',
-  //     'Vault10',
-  //   ];
-  //   const alteredVaultNames = [
-  //     'Vault1',
-  //     'Vault2',
-  //     'Vault3',
-  //     'Vault4',
-  //     'Vault6',
-  //     'Vault7',
-  //     'Vault8',
-  //     'Vault10',
-  //     'ThirdImpact',
-  //     'Cake',
-  //   ];
-  //   const vaultManager = new VaultManager({
-  //     vaultsPath: path.join(dataDir, 'vaults'),
-  //     keyManager: keyManager,
-  //     db: db,
-  //     acl: acl,
-  //     gestaltGraph: gestaltGraph,
-  //     fs: fs,
-  //     logger: logger,
-  //   });
-
-  //   await vaultManager.start({});
-
-  //   for (const vaultName of vaultNames) {
-  //     await vaultManager.createVault(vaultName);
-  //   }
-  //   const v10 = vaultManager.getVaultId('Vault10');
-  //   expect(v10).toBeTruthy();
-  //   await vaultManager.deleteVault(v10!);
-  //   const v5 = vaultManager.getVaultId('Vault5');
-  //   expect(v5).toBeTruthy();
-  //   await vaultManager.deleteVault(v5!);
-  //   const v9 = vaultManager.getVaultId('Vault9');
-  //   expect(v9).toBeTruthy();
-  //   const vault9 = vaultManager.getVault(v9!);
-  //   await vaultManager.renameVault(v9!, 'Vault10');
-  //   await vaultManager.createVault('ThirdImpact');
-  //   await vaultManager.createVault('Cake');
-  //   await vault9.create();
-  //   await vault9.initializeVault();
-  //   await vault9.addSecret('MySecret', Buffer.from('MyActualPassword'));
-
-  //   const vn: Array<string> = [];
-  //   vaultManager.listVaults().forEach((a) => vn.push(a.name));
-  //   expect(vn.sort()).toEqual(alteredVaultNames.sort());
-
-  //   await vaultManager.stop();
-  //   await gestaltGraph.stop();
-  //   await acl.stop();
-  //   await db.stop();
-
-  //   await db.start({
-  //     keyPair: keyManager.getRootKeyPair(),
-  //   });
-  //   await acl.start();
-  //   await gestaltGraph.start();
-  //   await vaultManager.start({});
-
-  //   await vaultManager.createVault('Pumpkin');
-
-  //   // implicit test of keys
-  //   const v102 = vaultManager.getVaultId('Vault10');
-  //   expect(v102).toBeTruthy();
-  //   expect(vault9.EncryptedFS.Stats).toEqual(
-  //     vaultManager.getVault(v102!).EncryptedFS.Stats,
-  //   );
-  //   const secret = await vaultManager.getVault(v102!).getSecret('MySecret');
-  //   expect(secret.toString()).toBe('MyActualPassword');
-  //   alteredVaultNames.push('Pumpkin');
-  //   expect(vaultManager.listVaults().length).toEqual(alteredVaultNames.length);
-
-  //   await vaultManager.stop();
-  //   await gestaltGraph.stop();
-  //   await acl.stop();
-  //   await db.stop();
-  // });
+    await db.start({
+      keyPair: keyManager.getRootKeyPair(),
+    });
+    await acl.start();
+    await gestaltGraph.start();
+    await vaultManager.start({});
+    await vaultManager.createVault('Pumpkin');
+    const v102 = vaultManager.getVaultId('Vault10');
+    expect(v102).toBeTruthy();
+    const secret = await vaultManager.getVault(v102!).getSecret('MySecret');
+    expect(secret.toString()).toBe('MyActualPassword');
+    alteredVaultNames.push('Pumpkin');
+    expect(vaultManager.listVaults().length).toEqual(alteredVaultNames.length);
+    await vaultManager.stop();
+  });
 });
 
 // Old tests for setting Vault Actions (are private now)

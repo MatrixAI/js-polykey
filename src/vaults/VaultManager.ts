@@ -30,7 +30,6 @@ import * as gestaltErrors from '../gestalts/errors';
 
 class VaultManager {
   public readonly vaultsPath: string;
-  protected nodeId: string;
   protected acl: ACL;
   protected gestaltGraph: GestaltGraph;
   protected fs: FileSystem;
@@ -38,13 +37,9 @@ class VaultManager {
   protected keyManager: KeyManager;
   protected nodeManager: NodeManager;
   protected logger: Logger;
-  protected gitFrontend: GitFrontend;
   protected workerManager?: WorkerManager;
-  private vaults: Vaults;
+  protected vaults: Vaults;
   protected _started: boolean;
-
-  // Concurrency for metadata
-  private metadataMutex: Mutex = new Mutex();
 
   /**
    * Construct a VaultManager object
@@ -90,7 +85,12 @@ class VaultManager {
 
   // TODO: Add in node manager started in here
   get started(): boolean {
-    if (this._started && this.keyManager.started) {
+    if (
+      this._started &&
+      this.keyManager.started &&
+      this.acl.started &&
+      this.gestaltGraph.started
+    ) {
       return true;
     }
     return false;
@@ -115,6 +115,10 @@ class VaultManager {
       throw new keysErrors.ErrorKeyManagerNotStarted();
     } else if (!(await this.nodeManager.started())) {
       throw new nodesErrors.ErrorNodeManagerNotStarted();
+    } else if (!this.acl.started) {
+      throw new aclErrors.ErrorACLNotStarted();
+    } else if (!this.gestaltGraph.started) {
+      throw new gestaltErrors.ErrorGestaltsGraphNotStarted();
     }
     if (fresh) {
       await this.fs.promises.rm(this.vaultsPath, {
@@ -218,83 +222,7 @@ class VaultManager {
     await this.vaultMap.renameVault(vault.vaultName, newVaultName);
     await vault.renameVault(newVaultName);
     this.vaults[vaultId].vaultName = newVaultName;
-
     return true;
-  }
-
-    /**
-   * Clones a vault from another node
-   *
-   * @throws ErrorRemoteVaultUndefined if vaultName does not exist on
-   * connected node
-   * @throws ErrorNodeConnectionNotExist if the address of the node to connect to
-   * does not exist
-   * @throws ErrorRGitPermissionDenied if the node cannot access the desired vault
-   * @param vaultId Id of vault
-   * @param nodeId identifier of node to clone from
-   */
-  public async cloneVault(vaultId: string, nodeId: string): Promise<void> {
-    const nodeAddress = await this.nodeManager.getNode(nodeId as NodeId);
-    if (!nodeAddress) {
-      throw new nodesErrors.ErrorNodeConnectionNotExist(
-        'Node does not exist in node store',
-      );
-    }
-    this.nodeManager.createConnectionToNode(nodeId as NodeId, nodeAddress);
-    const client = this.nodeManager.getClient(nodeId as NodeId);
-
-    // Send a message to the connected agent to see if the clone can occur
-    const vaultPermMessage = new agentPB.VaultPermMessage();
-    vaultPermMessage.setNodeid(this.nodeManager.getNodeId());
-    vaultPermMessage.setVaultid(vaultId);
-    const permission = await client.checkVaultPermissions(vaultPermMessage);
-    if (permission.getPermission() === false) {
-      throw new gitErrors.ErrorGitPermissionDenied();
-    }
-    const gitRequest = this.gitFrontend.connectToNodeGit(
-      client,
-      this.nodeManager.getNodeId(),
-    );
-    const vaultUrl = `http://0.0.0.0/${vaultId}`;
-    const info = await git.getRemoteInfo({
-      http: gitRequest,
-      url: vaultUrl,
-    });
-    if (!info.refs) {
-      // node does not have vault
-      throw new errors.ErrorRemoteVaultUndefined(
-        `${vaultId} does not exist on connected node ${nodeId}`,
-      );
-    }
-    const list = await gitRequest.scanVaults();
-    let vaultName;
-    for (const elem in list) {
-      const value = list[elem].split('\t');
-      if (value[0] === vaultId) {
-        vaultName = value[1];
-        break;
-      }
-    }
-    if (!vaultName) {
-      throw new errors.ErrorRemoteVaultUndefined(
-        `${vaultId} does not exist on connected node ${nodeId}`,
-      );
-    } else if (this.getVaultId(vaultName)) {
-      this.logger.warn(
-        `Vault Name '${vaultName}' already exists, cloned into '${vaultName} copy' instead`,
-      );
-      vaultName += ' copy';
-    }
-    const vault = await this.createVault(vaultName);
-    this.setLinkVault(vault.vaultId, vaultId);
-    // await git.clone({
-    //   fs: vault.EncryptedFS,
-    //   http: gitRequest,
-    //   dir: vault.vaultId,
-    //   url: vaultUrl,
-    //   ref: 'master',
-    //   singleBranch: true,
-    // });
   }
 
   /**
@@ -314,39 +242,29 @@ class VaultManager {
    *
    * @throws ErrorVaultUndefined if vault name does not exist
    * @param vaultId Id of vault to be deleted
-   * @returns true if successfil, false if vault path still exists
+   * @returns true if successful delete, false if vault path still exists
    */
   public async deleteVault(vaultId: string): Promise<boolean> {
-    return await this.acl._transaction(async () => {
-      if (!this.vaults[vaultId]) {
-        throw new errors.ErrorVaultUndefined(
-          `Vault does not exist: '${vaultId}'`,
-        );
-      }
-      // this is convenience function for removing all tags
-      // and triggering garbage collection
-      // destruction is a better word as we should ensure all traces are removed
-      await this.vaults[vaultId].vault.stop();
-      const vaultPath = path.join(this.vaultsPath, vaultId);
-      // Remove directory on file system
-      if (await fileExists(this.fs, vaultPath)) {
-        await this.fs.promises.rm(vaultPath, { recursive: true });
+    return await this.vaultMap._transaction(async () => {
+      return await this.acl._transaction(async () => {
+        if (!this.vaults[vaultId]) {
+          throw new errors.ErrorVaultUndefined(
+            `Vault does not exist: '${vaultId}'`,
+          );
+        }
+        await this.vaults[vaultId].vault.stop();
+        const vaultPath = this.vaults[vaultId].vault.baseDir;
         this.logger.info(`Removed vault directory at '${vaultPath}'`);
-      }
-
-      if (await fileExists(this.fs, vaultPath)) {
-        return false;
-      }
-      const vault = this.vaults[vaultId].vault;
-
-      // Remove from mappings
-      delete this.vaults[vaultId];
-
-      await this.vaultMap.delVault(vault.vaultName);
-
-      await this.acl.unsetVaultPerms(vault.vaultId as VaultId);
-
-      return true;
+        if (await fileExists(this.fs, this.vaults[vaultId].vault.baseDir)) {
+          return false;
+        }
+        const name = this.vaults[vaultId].vaultName;
+        await this.vaultMap.delVault(name);
+        await this.acl.unsetVaultPerms(vaultId as VaultId);
+        // Remove from mappings
+        delete this.vaults[vaultId];
+        return true;
+      });
     });
   }
 
@@ -365,6 +283,20 @@ class VaultManager {
     }
     return vaults;
   }
+
+  /**
+   * Gives vault id given the vault name
+   * @param vaultName The Vault name
+   * @returns the id that matches the given vault name. undefined if nothing is found
+   */
+  public getVaultId(vaultName: string): string | undefined {
+    for (const id in this.vaults) {
+      if (vaultName === this.vaults[id].vaultName) {
+        return id;
+      }
+    }
+  }
+
 
   /**
    * Scans all the vaults for current node which a node Id has permissions for
@@ -389,19 +321,6 @@ class VaultManager {
       }
       return vaults;
     });
-  }
-
-  /**
-   * Gives vault id given the vault name
-   * @param vaultName The Vault name
-   * @returns the id that matches the given vault name. undefined if nothing is found
-   */
-  public getVaultId(vaultName: string): string | undefined {
-    for (const id in this.vaults) {
-      if (vaultName === this.vaults[id].vaultName) {
-        return id;
-      }
-    }
   }
 
   /**
@@ -574,21 +493,91 @@ class VaultManager {
     });
   }
 
+    /**
+   * Clones a vault from another node
+   *
+   * @throws ErrorRemoteVaultUndefined if vaultName does not exist on
+   * connected node
+   * @throws ErrorNodeConnectionNotExist if the address of the node to connect to
+   * does not exist
+   * @throws ErrorRGitPermissionDenied if the node cannot access the desired vault
+   * @param vaultId Id of vault
+   * @param nodeId identifier of node to clone from
+   */
+     public async cloneVault(vaultId: string, nodeId: string): Promise<void> {
+      const nodeAddress = await this.nodeManager.getNode(nodeId as NodeId);
+      if (!nodeAddress) {
+        throw new nodesErrors.ErrorNodeConnectionNotExist(
+          'Node does not exist in node store',
+        );
+      }
+      this.nodeManager.createConnectionToNode(nodeId as NodeId, nodeAddress);
+      const client = this.nodeManager.getClient(nodeId as NodeId);
+
+      // Send a message to the connected agent to see if the clone can occur
+      const vaultPermMessage = new agentPB.VaultPermMessage();
+      vaultPermMessage.setNodeid(this.nodeManager.getNodeId());
+      vaultPermMessage.setVaultid(vaultId);
+      const permission = await client.checkVaultPermissions(vaultPermMessage);
+      if (permission.getPermission() === false) {
+        throw new gitErrors.ErrorGitPermissionDenied();
+      }
+      // const gitRequest = this.gitFrontend.connectToNodeGit(
+      //   client,
+      //   this.nodeManager.getNodeId(),
+      // );
+      // const vaultUrl = `http://0.0.0.0/${vaultId}`;
+      // const info = await git.getRemoteInfo({
+      //   http: gitRequest,
+      //   url: vaultUrl,
+      // });
+      // if (!info.refs) {
+      //   // node does not have vault
+      //   throw new errors.ErrorRemoteVaultUndefined(
+      //     `${vaultId} does not exist on connected node ${nodeId}`,
+      //   );
+      // }
+      // const list = await gitRequest.scanVaults();
+      // let vaultName;
+      // for (const elem in list) {
+      //   const value = list[elem].split('\t');
+      //   if (value[0] === vaultId) {
+      //     vaultName = value[1];
+      //     break;
+      //   }
+      // }
+      // if (!vaultName) {
+      //   throw new errors.ErrorRemoteVaultUndefined(
+      //     `${vaultId} does not exist on connected node ${nodeId}`,
+      //   );
+      // } else if (this.getVaultId(vaultName)) {
+      //   this.logger.warn(
+      //     `Vault Name '${vaultName}' already exists, cloned into '${vaultName} copy' instead`,
+      //   );
+      //   vaultName += ' copy';
+      // }
+      // const vault = await this.createVault(vaultName);
+      // this.setLinkVault(vault.vaultId, vaultId);
+      // await git.clone({
+      //   fs: vault.EncryptedFS,
+      //   http: gitRequest,
+      //   dir: vault.vaultId,
+      //   url: vaultUrl,
+      //   ref: 'master',
+      //   singleBranch: true,
+      // });
+    }
+
   /* === Helpers === */
   /**
    * Loads existing vaults data from the vaults db into memory.
    * If metadata does not exist, does nothing.
    */
   private async loadVaultData(): Promise<void> {
-    const release = await this.metadataMutex.acquire();
-    try {
+    return await this.vaultMap._transaction(async () => {
       const vaults = await this.vaultMap.loadVaultData();
       this.vaults = vaults;
-    } catch (err) {
-      release();
-      throw err;
-    }
-    release();
+    });
   }
 }
 
