@@ -1,17 +1,17 @@
-import type { DB } from '../db';
-import type { DBLevel, DBOp } from '../db/types';
-import type { VaultId, Vaults } from './types';
-import type { KeyManager } from '../keys';
+import type { DB } from '../../src/db';
+import type { DBLevel, DBOp } from '../../src/db/types';
+import type { VaultId, Vaults } from '../../src/vaults/types';
+import type { KeyManager } from '../../src/keys';
 
 import path from 'path';
 import fs from 'fs';
 import { Mutex } from 'async-mutex';
 import Logger from '@matrixai/logger';
 
-import { Vault } from './';
+import { Vault } from '../../src/vaults';
 
-import * as vaultErrors from './errors';
-import { errors as dbErrors } from '../db';
+import * as vaultErrors from '../../src/vaults/errors';
+import { errors as dbErrors } from '../../src/db';
 
 class VaultMap {
   public readonly vaultMapPath: string;
@@ -158,7 +158,7 @@ class VaultMap {
   }
 
   /**
-   * Gets the vault lin for a given vault id
+   * Gets the vault link for a given vault id
    */
   public async getVaultLinkByVaultId(
     vaultId: VaultId,

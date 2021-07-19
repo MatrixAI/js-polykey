@@ -1,7 +1,6 @@
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
-import { VirtualFS } from 'virtualfs';
 import git from 'isomorphic-git';
 import Vault from '@/vaults/Vault';
 import Logger, { LogLevel, StreamHandler } from '@matrixai/logger';

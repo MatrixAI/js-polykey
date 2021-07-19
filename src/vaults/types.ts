@@ -14,15 +14,10 @@ type VaultAction = 'clone' | 'pull';
 type VaultKey = Buffer;
 
 /**
- * map vaultId -> Vault, VaultKey, VaultName
+ * map vaultId -> Vault
  */
 type Vaults = {
-  [key: string]: {
-    vault: Vault;
-    vaultKey: VaultKey;
-    vaultName: string;
-    vaultLink?: string;
-  };
+  [vaultId: string]: Vault;
 };
 
 type NodePermissions = {

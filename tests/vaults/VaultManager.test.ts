@@ -288,13 +288,13 @@ describe('VaultManager is', () => {
     for (const vaultName of vaultNames) {
       await vaultManager.createVault(vaultName);
     }
-    const v10 = vaultManager.getVaultId('Vault10');
+    const v10 = await vaultManager.getVaultId('Vault10');
     expect(v10).toBeTruthy();
     await vaultManager.deleteVault(v10!);
-    const v5 = vaultManager.getVaultId('Vault5');
+    const v5 = await vaultManager.getVaultId('Vault5');
     expect(v5).toBeTruthy();
     await vaultManager.deleteVault(v5!);
-    const v9 = vaultManager.getVaultId('Vault9');
+    const v9 = await vaultManager.getVaultId('Vault9');
     expect(v9).toBeTruthy();
     const vault9 = vaultManager.getVault(v9!);
     await vaultManager.renameVault(v9!, 'Vault10');
@@ -316,7 +316,7 @@ describe('VaultManager is', () => {
     await gestaltGraph.start();
     await vaultManager.start({});
     await vaultManager.createVault('Pumpkin');
-    const v102 = vaultManager.getVaultId('Vault10');
+    const v102 = await vaultManager.getVaultId('Vault10');
     expect(v102).toBeTruthy();
     const secret = await vaultManager.getVault(v102!).getSecret('MySecret');
     expect(secret.toString()).toBe('MyActualPassword');
