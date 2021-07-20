@@ -16,6 +16,7 @@ import { KeyManager } from '../keys';
 import { NodeManager } from '../nodes';
 import { GestaltGraph } from '../gestalts';
 import { ACL } from '../acl';
+import { GitRequest } from '../git';
 import { agentPB } from '../agent';
 
 import * as utils from '../utils';
@@ -368,17 +369,17 @@ class VaultManager {
   }
 
   /**
-   * Sets the Vault Id that the specified vault has been cloned from
+   * Sets the default pull node of a vault
    *
    * @throws ErrorVaultUndefined if vaultId does not exist
    * @param vaultId Id of vault
    * @param linkVault Id of the cloned vault
    */
-  public async setLinkVault(vaultId: string, linkVault: string): Promise<void> {
+  public async setDefaultNode(vaultId: string, nodeId: string): Promise<void> {
     if (!this.vaults[vaultId]) {
       throw new vaultErrors.ErrorVaultUndefined(`${vaultId} does not exist`);
     } else {
-      await this.setVaultNodebyVaultId(vaultId as VaultId, linkVault);
+      await this.setVaultNodebyVaultId(vaultId as VaultId, nodeId);
     }
   }
 
@@ -389,72 +390,8 @@ class VaultManager {
    * @param vaultId Id of vault that has been cloned
    * @returns instance of the vault that is linked to the cloned vault
    */
-  // public getLinkVault(vaultId: string): Vault | undefined {
-  //   return await
-  // }
-
-  /**
-   * Gives pulling permissions for a vault to one or more nodes
-   *
-   * @param nodeIds Id(s) of the nodes to share with
-   * @param vaultId Id of the vault that the permissions are for
-   */
-  private async setVaultAction(
-    nodeIds: string[],
-    vaultId: string,
-  ): Promise<void> {
-    return await this.acl._transaction(async () => {
-      for (const nodeId of nodeIds) {
-        try {
-          await this.acl.setVaultAction(
-            vaultId as VaultId,
-            nodeId as NodeId,
-            'pull',
-          );
-        } catch (err) {
-          if (err instanceof aclErrors.ErrorACLNodeIdMissing) {
-            await this.acl.setNodePerm(nodeId as NodeId, {
-              gestalt: {
-                notify: null,
-              },
-              vaults: {},
-            });
-            await this.acl.setVaultAction(
-              vaultId as VaultId,
-              nodeId as NodeId,
-              'pull',
-            );
-          }
-        }
-      }
-    });
-  }
-
-  /**
-   * Removes pulling permissions for a vault for one or more nodes
-   *
-   * @param nodeIds Id(s) of the nodes to remove permissions from
-   * @param vaultId Id of the vault that the permissions are for
-   */
-  private async unsetVaultAction(
-    nodeIds: string[],
-    vaultId: string,
-  ): Promise<void> {
-    return await this.acl._transaction(async () => {
-      for (const nodeId of nodeIds) {
-        try {
-          await this.acl.unsetVaultAction(
-            vaultId as VaultId,
-            nodeId as NodeId,
-            'pull',
-          );
-        } catch (err) {
-          if (err instanceof aclErrors.ErrorACLNodeIdMissing) {
-            return;
-          }
-        }
-      }
-    });
+  public async getDefaultNode(vaultId: string): Promise<string | undefined> {
+    return await this.getVaultNodeByVaultId(vaultId as VaultId);
   }
 
   /**
@@ -465,7 +402,7 @@ class VaultManager {
    * @param nodeId Identifier for gestalt as NodeId
    * @param vaultId Id of the vault to set permissions for
    */
-  public async setVaultPerm(nodeId: string, vaultId: string): Promise<void> {
+  public async setVaultPermissions(nodeId: string, vaultId: string): Promise<void> {
     return await this.gestaltGraph._transaction(async () => {
       return await this.acl._transaction(async () => {
         const gestalt = await this.gestaltGraph.getGestaltByNode(
@@ -490,7 +427,7 @@ class VaultManager {
    * @param nodeId Identifier for gestalt as NodeId
    * @param vaultId Id of the vault to unset permissions for
    */
-  public async unsetVaultPerm(nodeId: string, vaultId: string): Promise<void> {
+  public async unsetVaultPermissions(nodeId: string, vaultId: string): Promise<void> {
     return await this.gestaltGraph._transaction(async () => {
       return await this.acl._transaction(async () => {
         const gestalt = await this.gestaltGraph.getGestaltByNode(
@@ -532,7 +469,7 @@ class VaultManager {
     });
   }
 
-    /**
+  /**
    * Clones a vault from another node
    *
    * @throws ErrorRemoteVaultUndefined if vaultName does not exist on
@@ -543,69 +480,110 @@ class VaultManager {
    * @param vaultId Id of vault
    * @param nodeId identifier of node to clone from
    */
-     public async cloneVault(vaultId: string, nodeId: string): Promise<void> {
-      const nodeAddress = await this.nodeManager.getNode(nodeId as NodeId);
-      if (!nodeAddress) {
-        throw new nodesErrors.ErrorNodeConnectionNotExist(
-          'Node does not exist in node store',
-        );
-      }
-      this.nodeManager.createConnectionToNode(nodeId as NodeId, nodeAddress);
-      const client = this.nodeManager.getClient(nodeId as NodeId);
-
-      // Send a message to the connected agent to see if the clone can occur
-      const vaultPermMessage = new agentPB.VaultPermMessage();
-      vaultPermMessage.setNodeid(this.nodeManager.getNodeId());
-      vaultPermMessage.setVaultid(vaultId);
-      const permission = await client.checkVaultPermissions(vaultPermMessage);
-      if (permission.getPermission() === false) {
-        throw new gitErrors.ErrorGitPermissionDenied();
-      }
-      // const gitRequest = this.gitFrontend.connectToNodeGit(
-      //   client,
-      //   this.nodeManager.getNodeId(),
-      // );
-      // const vaultUrl = `http://0.0.0.0/${vaultId}`;
-      // const info = await git.getRemoteInfo({
-      //   http: gitRequest,
-      //   url: vaultUrl,
-      // });
-      // if (!info.refs) {
-      //   // node does not have vault
-      //   throw new errors.ErrorRemoteVaultUndefined(
-      //     `${vaultId} does not exist on connected node ${nodeId}`,
-      //   );
-      // }
-      // const list = await gitRequest.scanVaults();
-      // let vaultName;
-      // for (const elem in list) {
-      //   const value = list[elem].split('\t');
-      //   if (value[0] === vaultId) {
-      //     vaultName = value[1];
-      //     break;
-      //   }
-      // }
-      // if (!vaultName) {
-      //   throw new errors.ErrorRemoteVaultUndefined(
-      //     `${vaultId} does not exist on connected node ${nodeId}`,
-      //   );
-      // } else if (this.getVaultId(vaultName)) {
-      //   this.logger.warn(
-      //     `Vault Name '${vaultName}' already exists, cloned into '${vaultName} copy' instead`,
-      //   );
-      //   vaultName += ' copy';
-      // }
-      // const vault = await this.createVault(vaultName);
-      // this.setLinkVault(vault.vaultId, vaultId);
-      // await git.clone({
-      //   fs: vault.EncryptedFS,
-      //   http: gitRequest,
-      //   dir: vault.vaultId,
-      //   url: vaultUrl,
-      //   ref: 'master',
-      //   singleBranch: true,
-      // });
+  public async cloneVault(vaultId: string, nodeId: string): Promise<void> {
+    // Create a connection to the specified node
+    const nodeAddress = await this.nodeManager.getNode(nodeId as NodeId);
+    if (!nodeAddress) {
+      throw new nodesErrors.ErrorNodeConnectionNotExist(
+        'Node does not exist in node store',
+      );
     }
+    this.nodeManager.createConnectionToNode(nodeId as NodeId, nodeAddress);
+    const client = this.nodeManager.getClient(nodeId as NodeId);
+
+    // Send a message to the connected agent to see if the clone can occur
+    const vaultPermMessage = new agentPB.VaultPermMessage();
+    vaultPermMessage.setNodeid(this.nodeManager.getNodeId());
+    vaultPermMessage.setVaultid(vaultId);
+    const permission = await client.checkVaultPermissions(vaultPermMessage);
+    if (permission.getPermission() === false) {
+      throw new gitErrors.ErrorGitPermissionDenied();
+    }
+
+    // Create the handler for git to clone from
+    const gitRequest = await vaultUtils.constructGitHandler(
+      client,
+      this.nodeManager.getNodeId(),
+    );
+
+    // Search for the given vault Id and return the name
+    const list = await gitRequest.scanVaults();
+    let vaultName = vaultUtils.searchVaultName(list, vaultId);
+    if (await this.getVaultId(vaultName)) {
+      this.logger.warn(
+        `'${vaultName}' already exists, cloned into '${vaultName} copy'`,
+      );
+      vaultName += ' copy';
+    }
+    await this.cloneVaultOps(gitRequest, vaultName, vaultId);
+    await this.setDefaultNode(vaultId, nodeId);
+  }
+
+  /**
+   * Pulls a vault from another node
+   *
+   * @throws ErrorVaultUnlinked if the vault does not have an already cloned repo
+   * @throws ErrorVaultModified if changes have been made to the local repo
+   * @throws ErrorNodeConnectionNotExist if the address of the node to connect to
+   * does not exist
+   * @throws ErrorRGitPermissionDenied if the node cannot access the desired vault
+   * @param vaultId Id of vault
+   * @param nodeId identifier of node to clone from
+   */
+   public async pullVault(vaultId: string, nodeId?: string): Promise<void> {
+    let node = nodeId;
+    if(!nodeId) {
+      node = await this.getDefaultNode(vaultId);
+    }
+    if (!node) {
+      throw new vaultErrors.ErrorVaultUnlinked(
+        'Vault Id has not been cloned from remote repository',
+      );
+    }
+    const nodeAddress = await this.nodeManager.getNode(node as NodeId);
+    if (!nodeAddress) {
+      throw new nodesErrors.ErrorNodeConnectionNotExist(
+        'Node does not exist in node store',
+      );
+    }
+    this.nodeManager.createConnectionToNode(node as NodeId, nodeAddress);
+    const client = this.nodeManager.getClient(node as NodeId);
+
+    // Send a message to the connected agent to see if the pull can occur
+    const vaultPermMessage = new agentPB.VaultPermMessage();
+    vaultPermMessage.setNodeid(this.nodeManager.getNodeId());
+    vaultPermMessage.setVaultid(vaultId);
+    const permission = await client.checkVaultPermissions(vaultPermMessage);
+    if (permission.getPermission() === false) {
+      throw new gitErrors.ErrorGitPermissionDenied();
+    }
+
+    // Create the handler for git to pull from
+    const gitRequest = await vaultUtils.constructGitHandler(
+      client,
+      this.nodeManager.getNodeId(),
+    );
+
+    const list = await gitRequest.scanVaults();
+
+    vaultUtils.searchVaultName(list, vaultId);
+
+    const vault = this.getVault(vaultId);
+    await vault.pullVault(gitRequest);
+    await this.setDefaultNode(vaultId, node);
+  }
+
+  /**
+   * Returns a generator that yields the names of the vaults
+   */
+  public async *handleVaultNamesRequest(
+    nodeId: string,
+  ): AsyncGenerator<Uint8Array> {
+    const vaults = await this.scanVaults(nodeId);
+    for (const vault in vaults) {
+      yield Buffer.from(`${vaults[vault].id}\t${vaults[vault].name}`);
+    }
+  }
 
   /* === Helpers === */
   /**
@@ -624,6 +602,31 @@ class VaultManager {
       vaultId = await vaultUtils.generateVaultId();
     }
     return vaultId;
+  }
+
+  /**
+   * Creates an empty vault that can be cloned into
+   *
+   * @throws ErrorVaultDefined if vault with the same name already exists
+   * @param vaultName Name of the new vault
+   * @returns The newly created vault object
+   */
+   private async cloneVaultOps(gitHandler: GitRequest, vaultName: string, vaultId: string): Promise<void> {
+    // Create the Vault instance and path
+    await this.fs.promises.mkdir(path.join(this.vaultsPath, vaultId));
+    const vault = new Vault({
+      vaultId: vaultId,
+      vaultName: vaultName,
+      baseDir: path.join(this.vaultsPath, vaultId),
+      fs: fs,
+      logger: this.logger,
+    });
+
+    // Generate the key and store the vault in memory and on disk
+    const key = await vaultUtils.generateVaultKey();
+    await this.createVaultOps(vaultName, vaultId as VaultId, key);
+    this.vaults[vaultId] = vault;
+    await vault.cloneVault(gitHandler, key);
   }
 
   /**
@@ -812,6 +815,82 @@ class VaultManager {
       return vaults;
     });
   }
+
+  /**
+   * Gives pulling permissions for a vault to one or more nodes
+   *
+   * @param nodeIds Id(s) of the nodes to share with
+   * @param vaultId Id of the vault that the permissions are for
+   */
+   private async setVaultAction(
+    nodeIds: string[],
+    vaultId: string,
+  ): Promise<void> {
+    return await this.acl._transaction(async () => {
+      for (const nodeId of nodeIds) {
+        try {
+          await this.acl.setVaultAction(
+            vaultId as VaultId,
+            nodeId as NodeId,
+            'pull',
+          );
+        } catch (err) {
+          if (err instanceof aclErrors.ErrorACLNodeIdMissing) {
+            await this.acl.setNodePerm(nodeId as NodeId, {
+              gestalt: {
+                notify: null,
+              },
+              vaults: {},
+            });
+            await this.acl.setVaultAction(
+              vaultId as VaultId,
+              nodeId as NodeId,
+              'pull',
+            );
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Removes pulling permissions for a vault for one or more nodes
+   *
+   * @param nodeIds Id(s) of the nodes to remove permissions from
+   * @param vaultId Id of the vault that the permissions are for
+   */
+  private async unsetVaultAction(
+    nodeIds: string[],
+    vaultId: string,
+  ): Promise<void> {
+    return await this.acl._transaction(async () => {
+      for (const nodeId of nodeIds) {
+        try {
+          await this.acl.unsetVaultAction(
+            vaultId as VaultId,
+            nodeId as NodeId,
+            'pull',
+          );
+        } catch (err) {
+          if (err instanceof aclErrors.ErrorACLNodeIdMissing) {
+            return;
+          }
+        }
+      }
+    });
+  }
 }
 
 export default VaultManager;
+
+
+    // const branch = await git.currentBranch({
+    //   fs: vault.EncryptedFS,
+    //   dir: vault.vaultId,
+    //   fullname: false,
+    // });
+    // if (branch !== 'master') {
+    //   throw new vaultsErrors.ErrorVaultModified(
+    //     'Modified repository can no longer pull changes',
+    //   );
+    // }

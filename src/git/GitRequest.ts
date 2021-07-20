@@ -37,15 +37,14 @@ class GitRequest {
 
     // Parse request
     if (method == 'GET') {
-      // Info request
       const match = u.pathname.match(/\/(.+)\/info\/refs$/);
       if (!match || /\.\./.test(match[1])) {
         throw new Error('Error');
       }
 
-      const vaultName = match![1];
+      const vaultId = match![1];
 
-      const infoResponse = this.requestInfo(vaultName);
+      const infoResponse = this.requestInfo(vaultId);
 
       return {
         url: url,
@@ -56,15 +55,14 @@ class GitRequest {
         statusMessage: 'OK',
       };
     } else if (method == 'POST') {
-      // Pack request
       const match = u.pathname.match(/\/(.+)\/git-(.+)/);
       if (!match || /\.\./.test(match[1])) {
         throw new Error('Error');
       }
 
-      const vaultName = match![1];
+      const vaultId = match![1];
 
-      const packResponse = this.requestPack(vaultName, body[0]);
+      const packResponse = this.requestPack(vaultId, body[0]);
 
       return {
         url: url,

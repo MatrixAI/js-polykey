@@ -7,9 +7,13 @@ import path from 'path';
 import git from 'isomorphic-git';
 import { Mutex } from 'async-mutex';
 import { EncryptedFS } from 'encryptedfs';
+import { PassThrough } from 'readable-stream';
 import Logger from '@matrixai/logger';
 
+import { GitRequest } from '../git';
+
 import * as utils from '../utils';
+import { utils as gitUtils } from '../git';
 import * as vaultsUtils from './utils';
 import * as errors from './errors';
 
@@ -60,7 +64,8 @@ class Vault {
     this.efs.unsetWorkerManager();
   }
 
-  public async start({ key }: { key: Buffer}) {
+  // TODO: Once EFS is updated, pass `this.fs` into EFS constructor
+  public async start({ key}: { key: Buffer }) {
     const efs = new EncryptedFS(key, fs, this.baseDir);
     this.efs = efs;
     const exists = utils.promisify(this.efs.exists).bind(this.efs);
@@ -523,6 +528,94 @@ class Vault {
       secrets.push(secret);
     }
     return secrets;
+  }
+
+  /**
+   * Clones secrets from a remote vault into this vault
+   * TODO: Once EFS is updated, pass `this.fs` into EFS constructor
+   */
+  public async cloneVault(gitHandler: GitRequest, vaultKey: Buffer): Promise<void> {
+    const efs = new EncryptedFS(vaultKey, fs, this.baseDir);
+    this.efs = efs;
+    await git.clone({
+      fs: this.efs,
+      http: gitHandler,
+      dir: '',
+      url: `http://0.0.0.0/${this.vaultId}`,
+      ref: 'master',
+      singleBranch: true,
+    });
+  }
+
+  /**
+   * Pulls secrets from a remote vault into this vault
+   */
+  public async pullVault(gitHandler: GitRequest): Promise<void> {
+    await git.pull({
+      fs: this.efs,
+      http: gitHandler,
+      dir: '',
+      url: `http://0.0.0.0/${this.vaultId}`,
+      ref: 'HEAD',
+      singleBranch: true,
+      author: {
+        name: this.vaultId,
+      },
+    });
+  }
+
+  /**
+   * Returns an async generator that yields buffers representing the git info response
+   * @param vaultName Name of vault
+   */
+  public async *handleInfoRequest(): AsyncGenerator<Buffer | null> {
+    // Service for uploading packets
+    const service = 'upload-pack';
+    // define the service
+    yield Buffer.from(
+      gitUtils.createGitPacketLine('# service=git-' + service + '\n'),
+    );
+
+    yield Buffer.from('0000');
+
+    for (const buffer of (await gitUtils.uploadPack(
+      this.efs,
+      this.vaultId,
+      undefined,
+      true,
+    )) ?? []) {
+      yield buffer;
+    }
+  }
+
+  /**
+   * Takes vaultName and a pack request and returns two streams used to handle the pack
+   * response
+   * @param vaultName name of the vault
+   * @param body body of pack request
+   * @returns Two streams used to send the pack response
+   */
+  public async handlePackRequest(body: Buffer) {
+    if (body.toString().slice(4, 8) == 'want') {
+      const wantedObjectId = body.toString().slice(9, 49);
+      const packResult = await gitUtils.packObjects(
+        this.efs,
+        this.vaultId,
+        [wantedObjectId],
+        undefined,
+      );
+      const readable = new PassThrough();
+      const progressStream = new PassThrough();
+      const sideBand = gitUtils.mux(
+        'side-band-64',
+        readable,
+        packResult.packstream,
+        progressStream,
+      );
+      return [sideBand, progressStream];
+    } else {
+      throw new Error('Method not implemented');
+    }
   }
 
   /* === Helpers === */

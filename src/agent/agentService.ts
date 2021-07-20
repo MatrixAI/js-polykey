@@ -1,7 +1,6 @@
 import type { NodeId } from '../nodes/types';
 import type { ClaimId } from '../claims/types';
 import * as grpc from '@grpc/grpc-js';
-import { GitBackend } from '../git';
 import { promisify } from '../utils';
 import * as networkUtils from '../network/utils';
 import { NodeManager } from '../nodes';
@@ -22,12 +21,10 @@ import * as claimsUtils from '../claims/utils';
 function createAgentService({
   vaultManager,
   nodeManager,
-  gitBackend,
   sigchain,
 }: {
   vaultManager: VaultManager;
   nodeManager: NodeManager;
-  gitBackend: GitBackend;
   sigchain: Sigchain;
 }): IAgentServer {
   const agentService: IAgentServer = {
@@ -45,10 +42,11 @@ function createAgentService({
       const genWritable = grpcUtils.generatorWritable(call);
 
       const request = call.request;
-      const vaultName = request.getVaultName();
+      const vaultId = request.getVaultName();
 
       const response = new agentPB.PackChunk();
-      const responseGen = gitBackend.handleInfoRequest(vaultName);
+      const vault = vaultManager.getVault(vaultId);
+      const responseGen = vault.handleInfoRequest();
 
       for await (const byte of responseGen) {
         if (byte !== null) {
@@ -73,12 +71,12 @@ function createAgentService({
         const body = Buffer.concat(clientBodyBuffers);
 
         const meta = call.metadata;
-        const vaultName = meta.get('vault-name').pop();
-        if (!vaultName) throw new ErrorGRPC('vault-name not in metadata.');
+        const vaultId = meta.get('vault-name').pop()?.toString();
+        if (!vaultId) throw new ErrorGRPC('vault-name not in metadata.');
+        const vault = vaultManager.getVault(vaultId);
 
         const response = new agentPB.PackChunk();
-        const [sideBand, progressStream] = await gitBackend.handlePackRequest(
-          vaultName.toString(),
+        const [sideBand, progressStream] = await vault.handlePackRequest(
           Buffer.from(body),
         );
 
@@ -113,7 +111,7 @@ function createAgentService({
       const response = new agentPB.PackChunk();
       const id = call.request.getNodeid();
 
-      const listResponse = gitBackend.handleVaultNamesRequest(id);
+      const listResponse = vaultManager.handleVaultNamesRequest(id);
 
       for await (const byte of listResponse) {
         if (byte !== null) {

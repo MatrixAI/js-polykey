@@ -14,6 +14,8 @@ import Hash from 'sha.js/sha1';
 import { PassThrough } from 'readable-stream';
 import createHash from 'sha.js';
 
+import * as vaultUtils from '../vaults/utils';
+
 const refpaths = (ref) => [
   `${ref}`,
   `refs/${ref}`,
@@ -185,7 +187,11 @@ async function listRefs(
   const packedMap = packedRefs(fileSystem, gitdir);
   let files: string[] = [];
   try {
-    files = await recursiveDirectoryWalk(`${gitdir}/${filepath}`, fs as any);
+    for (const file of await vaultUtils.readdirRecursivelyEFS(fileSystem, path.join(gitdir, filepath))) {
+      files.push(file);
+      // files = await recursiveDirectoryWalk(`${gitdir}/${filepath}`, fileSystem);
+    }
+
     files = files.map((x) => x.replace(`${gitdir}/${filepath}/`, ''));
   } catch (err) {
     files = [];
@@ -204,7 +210,6 @@ async function listRefs(
   }
   // since we just appended things onto an array, we need to sort them now
   files.sort(compareRefNames);
-
   return files;
 }
 
@@ -233,7 +238,6 @@ async function resolve(
   const packedMap = await packedRefs(fileSystem, gitdir);
   // Look in all the proper paths, in this order
   const allpaths = refpaths(ref).filter((p) => !GIT_FILES.includes(p)); // exclude git system files (#709)
-
   for (const ref of allpaths) {
     const sha =
       fileSystem
@@ -250,7 +254,7 @@ async function resolve(
 async function uploadPack(
   fileSystem: EncryptedFS,
   dir: string,
-  gitdir: string = path.join(dir, '.git'),
+  gitdir: string = '.git',
   advertiseRefs = false,
 ) {
   try {
@@ -288,7 +292,7 @@ async function packObjects(
   depth?: number,
   haves?: string[],
 ) {
-  const gitdir = path.join(dir, '.git');
+  const gitdir = '.git';
   const oids = new Set<string>();
   const shallows = new Set<string>();
   const unshallows = new Set();
@@ -340,7 +344,6 @@ async function packObjects(
     }
   }
   const objects = await listObjects(fileSystem, dir, gitdir, Array.from(oids));
-
   const packstream = new PassThrough();
   pack(fileSystem, dir, undefined, [...objects], packstream);
   return { packstream, shallows, unshallows, acks };
@@ -455,7 +458,7 @@ function parseBuffer(buffer) {
 async function log(
   fileSystem: EncryptedFS,
   dir,
-  gitdir = path.join(dir, '.git'),
+  gitdir = '.git',
   ref = 'HEAD',
   depth,
   since, // Date
@@ -718,7 +721,7 @@ async function read(
     // process can acquire external ref-deltas.
     const getExternalRefDelta = (oid: string) => read(fileSystem, gitdir, oid);
     // Iterate through all the .pack files
-    let list = fs.readdirSync(path.join(gitdir, '/objects/pack'));
+    let list = fileSystem.readdirSync(path.join(gitdir, '/objects/pack'));
     list = list.filter((x) => x.endsWith('.pack'));
     for (const filename of list) {
       // Try to get the packfile from the in-memory cache
@@ -790,7 +793,7 @@ function unwrap({ oid, buffer }) {
 async function pack(
   fileSystem: EncryptedFS,
   dir: string,
-  gitdir: string = path.join(dir, '.git'),
+  gitdir: string = '.git',
   oids: string[],
   outputStream: PassThrough,
 ) {

@@ -1,10 +1,11 @@
-import type { NodeId, NodeInfo } from '@/nodes/types';
+import type { NodeId, NodeAddress, NodeInfo } from '@/nodes/types';
 import { ProviderId, IdentityId, IdentityInfo } from '@/identities/types';
+import type { Host, Port, TLSConfig } from '@/network/types';
+import type { KeyPairPem, CertificatePem } from '@/keys/types';
 
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
-import level from 'level';
 import Logger, { LogLevel, StreamHandler } from '@matrixai/logger';
 
 import { KeyManager } from '@/keys';
@@ -14,8 +15,13 @@ import { ACL } from '@/acl';
 import { GestaltGraph } from '@/gestalts';
 import { DB } from '@/db';
 import { ForwardProxy, ReverseProxy } from '@/network';
+import GRPCServer from '@/grpc/GRPCServer';
+import { AgentService, createAgentService } from '@/agent';
 
-import * as errors from '@/vaults/errors';
+import { errors as vaultErrors } from '@/vaults';
+import * as keysUtils from '@/keys/utils';
+import { utils as networkUtils } from '@/network';
+import { errors as gitErrors } from '@/git';
 
 describe('VaultManager is', () => {
   const logger = new Logger('VaultManager Test', LogLevel.WARN, [
@@ -28,6 +34,11 @@ describe('VaultManager is', () => {
   let gestaltGraph: GestaltGraph;
   let nodeManager: NodeManager;
   let vaultManager: VaultManager;
+
+  const sourceHost = '127.0.0.1' as Host;
+  const sourcePort = 11112 as Port;
+  const targetHost = '127.0.0.2' as Host;
+  const targetPort = 11113 as Port;
 
   const fwdProxy = new ForwardProxy({
     authToken: 'abc',
@@ -52,6 +63,15 @@ describe('VaultManager is', () => {
     });
     await keyManager.start({
       password: 'password'
+    });
+
+    await fwdProxy.start({
+      tlsConfig: {
+        keyPrivatePem: keyManager.getRootKeyPairPem().privateKey,
+        certChainPem: await keyManager.getRootCertChainPem(),
+      },
+      egressHost: sourceHost,
+      egressPort: sourcePort,
     });
 
     nodeManager = new NodeManager({
@@ -109,6 +129,10 @@ describe('VaultManager is', () => {
       recursive: true,
     });
   });
+
+  afterAll(async () => {
+    await fwdProxy.stop();
+  })
   test('type correct', () => {
     expect(vaultManager).toBeInstanceOf(VaultManager);
   });
@@ -132,7 +156,7 @@ describe('VaultManager is', () => {
 
     expect(vault).toBe(theVault);
     expect(() => vaultManager.getVault('DoesNotExist')).toThrow(
-      errors.ErrorVaultUndefined,
+      vaultErrors.ErrorVaultUndefined,
     );
 
     await vaultManager.stop();
@@ -147,7 +171,7 @@ describe('VaultManager is', () => {
     expect(result).toBe(true);
     expect(vaultManager.getVault(vault.vaultId)).toBe(vault);
     await expect(vaultManager.renameVault('DoesNotExist', 'DNE')).rejects.toThrow(
-      errors.ErrorVaultUndefined,
+      vaultErrors.ErrorVaultUndefined,
     );
     await vaultManager.stop();
   });
@@ -185,6 +209,86 @@ describe('VaultManager is', () => {
     expect(stat1.ctime < stat2.ctime).toBeTruthy();
     await vaultManager.stop();
   });
+  test('able to update the default node repo to pull from', async () => {
+    await vaultManager.start({});
+    const vault1 = await vaultManager.createVault('MyTestVault');
+    const vault2 = await vaultManager.createVault('MyOtherTestVault');
+    const noNode = await vaultManager.getDefaultNode(vault1.vaultId);
+    expect(noNode).toBeUndefined();
+    await vaultManager.setDefaultNode(vault1.vaultId, 'abc');
+    const node = await vaultManager.getDefaultNode(vault1.vaultId);
+    const noNode2 = await vaultManager.getDefaultNode(vault2.vaultId);
+    expect(node).toBe('abc');
+    expect(noNode2).toBeUndefined();
+    await vaultManager.stop();
+  });
+  test('checking gestalt permissions for vaults', async () => {
+    const node1: NodeInfo = {
+      id: '123' as NodeId,
+      links: { nodes: {}, identities: {} },
+    };
+    const node2: NodeInfo = {
+      id: '345' as NodeId,
+      links: { nodes: {}, identities: {} },
+    };
+    const node3: NodeInfo = {
+      id: '678' as NodeId,
+      links: { nodes: {}, identities: {} },
+    };
+    const node4: NodeInfo = {
+      id: '890' as NodeId,
+      links: { nodes: {}, identities: {} },
+    };
+    const id1: IdentityInfo = {
+      providerId: 'github.com' as ProviderId,
+      identityId: 'abc' as IdentityId,
+      links: {
+        nodes: {},
+      },
+    };
+    const id2: IdentityInfo = {
+      providerId: 'github.com' as ProviderId,
+      identityId: 'def' as IdentityId,
+      links: {
+        nodes: {},
+      },
+    };
+
+    await gestaltGraph.setNode(node1);
+    await gestaltGraph.setNode(node2);
+    await gestaltGraph.setNode(node3);
+    await gestaltGraph.setNode(node4);
+    await gestaltGraph.setIdentity(id1);
+    await gestaltGraph.setIdentity(id2);
+    await gestaltGraph.linkNodeAndNode(node1, node2);
+    await gestaltGraph.linkNodeAndIdentity(node1, id1);
+    await gestaltGraph.linkNodeAndIdentity(node4, id2);
+
+    await vaultManager.start({});
+    const vault = await vaultManager.createVault('Test');
+    await vaultManager.setVaultPermissions('123', vault.vaultId);
+    let record = await vaultManager.getVaultPermissions(vault.vaultId);
+    expect(record).not.toBeUndefined();
+    expect(record['123']['pull']).toBeNull();
+    expect(record['345']['pull']).toBeNull();
+    expect(record['678']).toBeUndefined();
+    expect(record['890']).toBeUndefined();
+
+    await vaultManager.unsetVaultPermissions('345', vault.vaultId);
+    record = await vaultManager.getVaultPermissions(vault.vaultId);
+    expect(record).not.toBeUndefined();
+    expect(record['123']['pull']).toBeUndefined();
+    expect(record['345']['pull']).toBeUndefined();
+
+    await gestaltGraph.unlinkNodeAndNode(node1.id, node2.id);
+    await vaultManager.setVaultPermissions('345', vault.vaultId);
+    record = await vaultManager.getVaultPermissions(vault.vaultId);
+    expect(record).not.toBeUndefined();
+    expect(record['123']['pull']).toBeUndefined();
+    expect(record['345']['pull']).toBeNull();
+
+    await vaultManager.stop();
+  });
   test('able to create many vaults', async () => {
     const vaultNames = [
       'Vault1',
@@ -215,7 +319,7 @@ describe('VaultManager is', () => {
     expect(vaultManager.listVaults().length).toEqual(vaultNames.length);
     await vaultManager.stop();
   });
-  test('able to read and load existing metadata', async () => {
+  test.only('able to read and load existing metadata', async () => {
     const vaultNames = [
       'Vault1',
       'Vault2',
@@ -324,177 +428,213 @@ describe('VaultManager is', () => {
     expect(vaultManager.listVaults().length).toEqual(alteredVaultNames.length);
     await vaultManager.stop();
   });
+  /* TESTING TODO:
+   *  Changing the default node to pull from
+   */
+  describe('interacting with another node to', () => {
+    let targetDataDir: string;
+    let targetKeyManager: KeyManager;
+    let targetFwdProxy: ForwardProxy;
+    let targetDb: DB;
+    let targetACL: ACL;
+    let targetGestaltGraph: GestaltGraph;
+    let targetNodeManager: NodeManager;
+    let targetVaultManager: VaultManager;
+
+    let targetNodeId: NodeId;
+    let targetKeyPairPem: KeyPairPem;
+    let targetCertPem: CertificatePem;
+    let revTLSConfig: TLSConfig;
+
+    let agentService;
+    let server: GRPCServer;
+
+    let node: NodeInfo;
+
+    beforeEach(async () => {
+      node = {
+        id: nodeManager.getNodeId(),
+        links: { nodes: {}, identities: {} },
+      };
+      const targetKeyPair = await keysUtils.generateKeyPair(4096);
+      targetKeyPairPem = keysUtils.keyPairToPem(targetKeyPair);
+      const targetCert = keysUtils.generateCertificate(
+        targetKeyPair.publicKey,
+        targetKeyPair.privateKey,
+        targetKeyPair.privateKey,
+        12332432423,
+      );
+
+      targetCertPem = keysUtils.certToPem(targetCert);
+      targetNodeId = networkUtils.certNodeId(targetCert);
+      revTLSConfig = {
+        keyPrivatePem: targetKeyPairPem.privateKey,
+        certChainPem: targetCertPem,
+      };
+      targetDataDir = await fs.promises.mkdtemp(
+        path.join(os.tmpdir(), 'polykey-test-'),
+      );
+      targetKeyManager = new KeyManager({
+        keysPath: path.join(targetDataDir, 'keys'),
+        fs: fs,
+        logger: logger,
+      });
+      await targetKeyManager.start({ password: 'password' });
+      targetFwdProxy = new ForwardProxy({
+        authToken: '',
+        logger: logger,
+      });
+      targetNodeManager = new NodeManager({
+        nodesPath: path.join(targetDataDir, 'nodes'),
+        keyManager: targetKeyManager,
+        fwdProxy: targetFwdProxy,
+        revProxy: revProxy,
+        fs: fs,
+        logger: logger,
+      });
+      await targetNodeManager.start({ nodeId: targetNodeId });
+      targetDb = new DB({
+        dbPath: path.join(targetDataDir, 'db'),
+        logger: logger,
+      });
+      await targetDb.start({ keyPair: keyManager.getRootKeyPair() });
+      targetACL = new ACL({
+        db: targetDb,
+        logger: logger,
+      });
+      await targetACL.start();
+      targetGestaltGraph = new GestaltGraph({
+        db: targetDb,
+        acl: targetACL,
+        logger: logger,
+      });
+      await targetGestaltGraph.start();
+      await targetGestaltGraph.setNode(node);
+      targetVaultManager = new VaultManager({
+        vaultsPath: path.join(targetDataDir, 'vaults'),
+        keyManager: targetKeyManager,
+        nodeManager: targetNodeManager,
+        db: targetDb,
+        acl: targetACL,
+        gestaltGraph: targetGestaltGraph,
+        logger: logger,
+      });
+      await targetVaultManager.start({});
+      agentService = createAgentService({
+        vaultManager: targetVaultManager,
+        nodeManager: targetNodeManager,
+      });
+      server = new GRPCServer({
+        services: [[AgentService, agentService]],
+        logger: logger,
+      });
+      await server.start({
+        host: targetHost,
+      });
+
+      await revProxy.start({
+        ingressHost: targetHost,
+        ingressPort: targetPort,
+        serverHost: targetHost,
+        serverPort: server.getPort(),
+        tlsConfig: revTLSConfig,
+      });
+    });
+
+    afterEach(async () => {
+      await revProxy.closeConnection(
+        fwdProxy.getEgressHost(),
+        fwdProxy.getEgressPort(),
+      );
+      await fwdProxy.closeConnection(
+        fwdProxy.getEgressHost(),
+        fwdProxy.getEgressPort(),
+      );
+      await revProxy.stop();
+      await server.stop();
+      await targetVaultManager.stop();
+      await targetGestaltGraph.stop();
+      await targetACL.stop();
+      await targetDb.stop();
+      await targetNodeManager.stop();
+      await targetKeyManager.stop();
+      await targetFwdProxy.stop();
+      await fs.promises.rm(targetDataDir, {
+        force: true,
+        recursive: true,
+      });
+    });
+    test('clone and pull vaults', async () => {
+      await vaultManager.start({});
+      const vault = await targetVaultManager.createVault('MyFirstVault');
+      await targetVaultManager.setVaultPermissions(
+        nodeManager.getNodeId(),
+        vault.vaultId,
+      );
+      await vault.addSecret('MyFirstSecret', 'Success?');
+      await nodeManager.setNode(targetNodeId, {
+        ip: targetHost,
+        port: targetPort,
+      } as NodeAddress);
+      await nodeManager.createConnectionToNode(targetNodeId, {
+        ip: targetHost,
+        port: targetPort,
+      } as NodeAddress);
+      await revProxy.openConnection(sourceHost, sourcePort);
+      await vaultManager.cloneVault(vault.vaultId, targetNodeId);
+      await expect(vaultManager.getDefaultNode(vault.vaultId)).resolves.toBe(targetNodeId);
+      const vaultsList = vaultManager.listVaults();
+      expect(vaultsList[0].name).toStrictEqual('MyFirstVault');
+      const clonedVault = vaultManager.getVault(vaultsList[0].id);
+      expect(await clonedVault.getSecret('MyFirstSecret')).toStrictEqual(
+        'Success?',
+      );
+      vault.addSecret('MySecondSecret', 'SecondSuccess?');
+      await vaultManager.pullVault(vault.vaultId, targetNodeId);
+      expect((await clonedVault.listSecrets()).sort()).toStrictEqual(
+        ['MyFirstSecret', 'MySecondSecret'].sort(),
+      );
+      expect(await clonedVault.getSecret('MySecondSecret')).toStrictEqual(
+        'SecondSuccess?',
+      );
+    });
+    test('reject clone and pull ops when permissions are not set', async () => {
+      await vaultManager.start({});
+      const vault = await targetVaultManager.createVault('MyFirstVault');
+      await vault.addSecret('MyFirstSecret', 'Success?');
+      await nodeManager.setNode(targetNodeId, {
+        ip: targetHost,
+        port: targetPort,
+      } as NodeAddress);
+      await nodeManager.createConnectionToNode(targetNodeId, {
+        ip: targetHost,
+        port: targetPort,
+      } as NodeAddress);
+      await revProxy.openConnection(sourceHost, sourcePort);
+      await expect(
+        vaultManager.cloneVault(vault.vaultId, targetNodeId),
+      ).rejects.toThrow(gitErrors.ErrorGitPermissionDenied);
+      const vaultsList = vaultManager.listVaults();
+      expect(vaultsList).toStrictEqual([]);
+      await targetVaultManager.setVaultPermissions(
+        nodeManager.getNodeId(),
+        vault.vaultId,
+      );
+      await vaultManager.cloneVault(vault.vaultId, targetNodeId);
+      await targetVaultManager.unsetVaultPermissions(
+        nodeManager.getNodeId(),
+        vault.vaultId,
+      );
+      vault.addSecret('MySecondSecret', 'SecondSuccess?');
+      await expect(
+        vaultManager.pullVault(vault.vaultId, targetNodeId),
+      ).rejects.toThrow(gitErrors.ErrorGitPermissionDenied);
+      const list = vaultManager.listVaults();
+      const clonedVault = vaultManager.getVault(list[0].id);
+      expect((await clonedVault.listSecrets()).sort()).toStrictEqual(
+        ['MyFirstSecret'].sort(),
+      );
+      await vaultManager.stop();
+    });
+  });
 });
-
-// Old tests for setting Vault Actions (are private now)
-// test('setting vault permissions', async () => {
-//   const vaultManager = new VaultManager({
-//     vaultsPath: path.join(dataDir, 'vaults'),
-//     keyManager: keyManager,
-//     db: db,
-//     acl: acl,
-//     gestaltGraph: gestaltGraph,
-//     fs: fs,
-//     logger: logger,
-//   });
-//   await vaultManager.start({});
-//   const vault = await vaultManager.createVault('Test');
-//   await vaultManager.setVaultAction(['1234567'], vault.vaultId);
-//   const record = await acl.getNodePerm('1234567' as NodeId);
-//   expect(record?.vaults[vault.vaultId]['pull']).toBeNull();
-//   expect(record?.vaults[vault.vaultId]['clone']).toBeUndefined();
-//   await expect(acl.getNodePerm('1234568' as NodeId)).resolves.toBeUndefined();
-//   await vaultManager.setVaultAction(['1', '2', '3', '4', '5'], vault.vaultId);
-//   await vaultManager.unsetVaultAction(['5'], vault.vaultId);
-//   const perms = await acl.getVaultPerm(vault.vaultId as VaultId);
-//   expect(perms['1'].vaults[vault.vaultId]['pull']).toBeNull();
-//   expect(perms['2'].vaults[vault.vaultId]['pull']).toBeNull();
-//   expect(perms['3'].vaults[vault.vaultId]['pull']).toBeNull();
-//   expect(perms['4'].vaults[vault.vaultId]['pull']).toBeNull();
-//   expect(perms['5'].vaults[vault.vaultId]['pull']).toBeUndefined();
-
-//   await vaultManager.stop();
-// });
-// test('unsetting vault permissions', async () => {
-//   const vaultManager = new VaultManager({
-//     vaultsPath: path.join(dataDir, 'vaults'),
-//     keyManager: keyManager,
-//     db: db,
-//     acl: acl,
-//     gestaltGraph: gestaltGraph,
-//     fs: fs,
-//     logger: logger,
-//   });
-//   await vaultManager.start({});
-//   const vault = await vaultManager.createVault('Test');
-//   await vaultManager.setVaultAction(['1234567'], vault.vaultId);
-//   await vaultManager.unsetVaultAction(['1234567'], vault.vaultId);
-//   const record = await acl.getNodePerm('1234567' as NodeId);
-//   expect(record?.vaults[vault.vaultId]['pull']).toBeUndefined();
-//   await vaultManager.setVaultAction(['1', '2', '3', '4', '5'], vault.vaultId);
-//   await vaultManager.unsetVaultAction(['2', '3', '4', '5'], vault.vaultId);
-//   const perms = await acl.getVaultPerm(vault.vaultId as VaultId);
-//   expect(perms['1'].vaults[vault.vaultId]['pull']).toBeNull();
-//   expect(perms['2'].vaults[vault.vaultId]['pull']).toBeUndefined();
-//   expect(perms['3'].vaults[vault.vaultId]['pull']).toBeUndefined();
-//   expect(perms['4'].vaults[vault.vaultId]['pull']).toBeUndefined();
-//   expect(perms['5'].vaults[vault.vaultId]['pull']).toBeUndefined();
-//   await vaultManager.stop();
-// });
-// test('checking the vault permissions', async () => {
-//   const vaultManager = new VaultManager({
-//     vaultsPath: path.join(dataDir, 'vaults'),
-//     keyManager: keyManager,
-//     db: db,
-//     acl: acl,
-//     gestaltGraph: gestaltGraph,
-//     fs: fs,
-//     logger: logger,
-//   });
-//   await vaultManager.start({});
-//   const vault = await vaultManager.createVault('Test');
-//   await vaultManager.setVaultAction(
-//     ['one', 'two', 'three', 'four', 'five', 'six'],
-//     vault.vaultId,
-//   );
-//   await vaultManager.unsetVaultAction(
-//     ['one', 'three', 'five'],
-//     vault.vaultId,
-//   );
-//   const record = await vaultManager.getVaultPermissions(vault.vaultId);
-//   expect(record).not.toBeUndefined();
-//   expect(record['one']['pull']).toBeUndefined();
-//   expect(record['three']['pull']).toBeUndefined();
-//   expect(record['five']['pull']).toBeUndefined();
-//   expect(record['two']['pull']).toBeNull();
-//   expect(record['four']['pull']).toBeNull();
-//   expect(record['six']['pull']).toBeNull();
-//   const perm = await vaultManager.getVaultPermissions(vault.vaultId, 'two');
-//   expect(perm['two']['pull']).toBeNull();
-//   expect(perm['four']).toBeUndefined();
-//   await vaultManager.stop();
-// });
-  // test('checking gestalt permissions for vaults', async () => {
-  //   const vaultManager = new VaultManager({
-  //     vaultsPath: path.join(dataDir, 'vaults'),
-  //     keyManager: keyManager,
-  //     db: db,
-  //     acl: acl,
-  //     gestaltGraph: gestaltGraph,
-  //     fs: fs,
-  //     logger: logger,
-  //   });
-
-  //   const node1: NodeInfo = {
-  //     id: '123' as NodeId,
-  //     links: { nodes: {}, identities: {} },
-  //   };
-  //   const node2: NodeInfo = {
-  //     id: '345' as NodeId,
-  //     links: { nodes: {}, identities: {} },
-  //   };
-  //   const node3: NodeInfo = {
-  //     id: '678' as NodeId,
-  //     links: { nodes: {}, identities: {} },
-  //   };
-  //   const node4: NodeInfo = {
-  //     id: '890' as NodeId,
-  //     links: { nodes: {}, identities: {} },
-  //   };
-  //   const id1: IdentityInfo = {
-  //     providerId: 'github.com' as ProviderId,
-  //     identityId: 'abc' as IdentityId,
-  //     links: {
-  //       nodes: {},
-  //     },
-  //   };
-  //   const id2: IdentityInfo = {
-  //     providerId: 'github.com' as ProviderId,
-  //     identityId: 'def' as IdentityId,
-  //     links: {
-  //       nodes: {},
-  //     },
-  //   };
-
-  //   await gestaltGraph.setNode(node1);
-  //   await gestaltGraph.setNode(node2);
-  //   await gestaltGraph.setNode(node3);
-  //   await gestaltGraph.setNode(node4);
-  //   await gestaltGraph.setIdentity(id1);
-  //   await gestaltGraph.setIdentity(id2);
-
-  //   await gestaltGraph.linkNodeAndNode(node1, node2);
-  //   await gestaltGraph.linkNodeAndIdentity(node1, id1);
-  //   await gestaltGraph.linkNodeAndIdentity(node4, id2);
-
-  //   await vaultManager.start({});
-
-  //   const vault = await vaultManager.createVault('Test');
-
-  //   await vaultManager.setVaultPerm('123', vault.vaultId);
-
-  //   let record = await vaultManager.getVaultPermissions(vault.vaultId);
-  //   expect(record).not.toBeUndefined();
-  //   expect(record['123']['pull']).toBeNull();
-  //   expect(record['345']['pull']).toBeNull();
-  //   expect(record['678']).toBeUndefined();
-  //   expect(record['890']).toBeUndefined();
-
-  //   await vaultManager.unsetVaultPerm('345', vault.vaultId);
-
-  //   record = await vaultManager.getVaultPermissions(vault.vaultId);
-  //   expect(record).not.toBeUndefined();
-  //   expect(record['123']['pull']).toBeUndefined();
-  //   expect(record['345']['pull']).toBeUndefined();
-
-  //   await gestaltGraph.unlinkNodeAndNode(node1.id, node2.id);
-
-  //   await vaultManager.setVaultPerm('345', vault.vaultId);
-
-  //   record = await vaultManager.getVaultPermissions(vault.vaultId);
-  //   expect(record).not.toBeUndefined();
-  //   expect(record['123']['pull']).toBeUndefined();
-  //   expect(record['345']['pull']).toBeNull();
-
-  //   await vaultManager.stop();
-  // });
