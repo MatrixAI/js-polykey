@@ -45,7 +45,7 @@ function createAgentService({
       const vaultId = request.getVaultName();
 
       const response = new agentPB.PackChunk();
-      const vault = vaultManager.getVault(vaultId);
+      const vault = await vaultManager.getVault(vaultId);
       const responseGen = vault.handleInfoRequest();
 
       for await (const byte of responseGen) {
@@ -73,7 +73,7 @@ function createAgentService({
         const meta = call.metadata;
         const vaultId = meta.get('vault-name').pop()?.toString();
         if (!vaultId) throw new ErrorGRPC('vault-name not in metadata.');
-        const vault = vaultManager.getVault(vaultId);
+        const vault = await vaultManager.getVault(vaultId);
 
         const response = new agentPB.PackChunk();
         const [sideBand, progressStream] = await vault.handlePackRequest(

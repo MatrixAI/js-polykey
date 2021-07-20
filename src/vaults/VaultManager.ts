@@ -169,7 +169,7 @@ class VaultManager {
     if (fresh) {
       await this.vaultsDb.clear();
     }
-    await this.loadVaultData();
+    // await this.loadVaultData();
     this._started = true;
   }
 
@@ -244,9 +244,10 @@ class VaultManager {
    * @param vaultId Id of vault
    * @returns a vault instance.
    */
-  public getVault(vaultId: string): Vault {
+  public async getVault(vaultId: string): Promise<Vault> {
     if (!this.vaults[vaultId]) {
-      throw new vaultErrors.ErrorVaultUndefined(`${vaultId} does not exist`);
+      await this.setupVault(vaultId);
+      throw Error();
     } else {
       return this.vaults[vaultId];
     }
@@ -568,7 +569,7 @@ class VaultManager {
 
     vaultUtils.searchVaultName(list, vaultId);
 
-    const vault = this.getVault(vaultId);
+    const vault = await this.getVault(vaultId);
     await vault.pullVault(gitRequest);
     await this.setDefaultNode(vaultId, node);
   }
@@ -777,6 +778,20 @@ class VaultManager {
         },
       ];
       await this.db.batch(ops);
+    });
+  }
+
+  private async setupVault(vaultId: string) {
+    return await this._transaction(async () => {
+      // const vaultName = await this.getVaultIdByVaultName
+      this.vaults[vaultId] = new Vault({
+          vaultId: vaultId,
+          vaultName: 'name',
+          baseDir: path.join(this.vaultsPath, vaultId),
+          fs: fs,
+          logger: this.logger,
+        });
+      // this.vaults[vaultId].start({ key: vaultKey });
     });
   }
 
