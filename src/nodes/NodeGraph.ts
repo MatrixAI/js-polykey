@@ -72,7 +72,6 @@ class NodeGraph {
     nodeId: NodeId;
     fresh?: boolean;
   }) {
-<<<<<<< HEAD
     try {
       this.logger.info('Starting Node Graph');
       this._started = true;
@@ -87,34 +86,6 @@ class NodeGraph {
       const nodeGraphBucketsDb = await this.db.level<NodeBucketIndex>(
         this.nodeGraphBucketsDbDomain[1],
         nodeGraphDb,
-=======
-    this.logger.info('Starting Node Graph');
-    this.logger.info(`Setting node path to ${this.nodePath}`);
-    if (fresh) {
-      await this.fs.promises.rm(this.nodePath, {
-        force: true,
-        recursive: true,
-      });
-    }
-    await utils.mkdirExists(this.fs, this.nodePath);
-    const bucketsDbKey = await this.setupBucketsDbKey(bits);
-    this.bucketsDbKey = bucketsDbKey;
-    // Value is { nodeID, IP address, port } (i.e. a JSON)
-    // Encoded in binary as it's encrypted in the database
-    const bucketsDb = await level(this.bucketsDbPath, {
-      valueEncoding: 'binary',
-    });
-    this.nodeId = nodeId;
-    this.bucketsDb = bucketsDb;
-    this._started = true;
-
-    this.brokerNodes = brokerNodes;
-    // Establish and start connections to the brokers
-    for (const brokerId of Object.keys(this.brokerNodes)) {
-      await this.createConnectionToBroker(
-        brokerId as NodeId,
-        this.brokerNodes[brokerId].address,
->>>>>>> wip
       );
       if (fresh) {
         await nodeGraphDb.clear();
@@ -525,159 +496,7 @@ class NodeGraph {
         }
       });
     }
-<<<<<<< HEAD
     return foundAddress;
-=======
-    return foundTarget;
-  }
-
-  public getClient(nodeId: NodeId) {
-    const conn = this.connections.get(nodeId);
-    if (conn) {
-      return conn.getClient();
-    } else {
-      throw new nodeErrors.ErrorNodeConnectionNotExist();
-    }
-  }
-
-  /**
-   * Relays a received hole punch message to the target.
-   * The node is assumed to be known, and a connection to the node is also assumed
-   * to have already been established (as right now, this will only be called by
-   * a 'broker' node).
-   * @param message the original relay message (assumed to be created in
-   * nodeConnection.start())
-   */
-  public async relayHolePunchMessage(
-    message: agentPB.RelayMessage,
-  ): Promise<void> {
-    const conn = this.connections.get(message.getTargetid() as NodeId);
-    if (conn === undefined) {
-      throw new nodeErrors.ErrorNodeConnectionNotExist();
-    }
-    await conn.sendHolePunchMessage(
-      message.getSrcid() as NodeId,
-      message.getTargetid() as NodeId,
-      message.getEgressaddress(),
-      Buffer.from(message.getSignature()),
-    );
-  }
-
-  /**
-   * Generates symmetric key for database encryption/decryption.
-   */
-  protected async setupBucketsDbKey(bits: number = 256): Promise<Buffer> {
-    // let bucketsDbKey = await this.keyManager.getKey(this.constructor.name);
-    // if (bucketsDbKey != null) {
-    //   return bucketsDbKey;
-    // }
-    this.logger.info('Generating buckets db key');
-    let bucketsDbKey = await keysUtils.generateKey(bits);
-    // await this.keyManager.putKey(this.constructor.name, bucketsDbKey);
-    return bucketsDbKey;
-  }
-
-  /**
-   * Database helper: 'get' requests for buckets
-   * Handles exceptions (returning undefined if the bucket index is not valid)
-   * and decrypts the data before returning.
-   *
-   * @param bucketIndex ID of the bucket to retrieve from database
-   * @returns the node bucket, or undefined (if the bucket doesn't exist in db)
-   */
-  protected async getBucketsDb(
-    bucketIndex: number,
-  ): Promise<NodeBucket | undefined> {
-    if (!this._started) {
-      throw new nodeErrors.ErrorNodeGraphNotStarted();
-    }
-    let data: Buffer;
-    try {
-      // Try to retrieve the bucket from the database
-      data = await this.bucketsDb.get(bucketIndex);
-    } catch (e) {
-      if (e.notFound) {
-        return undefined;
-      }
-      throw e;
-    }
-    return nodeUtils.unserializeGraphValue(this.bucketsDbKey, data);
-  }
-
-  /**
-   * Database helper: 'put' requests for buckets
-   * Ensures bucket index is valid, and encrypts the data before insertion.
-   *
-   * @param bucketIndex index of the bucket to be added (i.e. the key in db)
-   * @param bucket bucket data to be inserted (mappings from nodeId -> nodeAddress)
-   */
-  protected async putBucketsDb(
-    bucketIndex: number,
-    bucket: NodeBucket,
-  ): Promise<void> {
-    if (!this._started) {
-      throw new nodeErrors.ErrorNodeGraphNotStarted();
-    }
-    // Ensure valid bucket (between 0 and nodeIdBits-1)
-    if (bucketIndex < 0 || bucketIndex >= this.nodeIdBits) {
-      throw new nodeErrors.ErrorNodeGraphInvalidBucketIndex();
-    }
-    const data = nodeUtils.serializeGraphValue(this.bucketsDbKey, bucket);
-    await this.bucketsDb.put(bucketIndex, data);
-  }
-
-  /**
-   * Database helper: 'del' requests for a specific node in the database
-   * Locates and retrieves the expected bucket, and deletes the node from the
-   * bucket, reinserting the bucket into the database.
-   *
-   * @param nodeId node to be removed from the database
-   */
-  protected async delBucketsDb(
-    bucketIndex: number,
-    nodeId: NodeId,
-  ): Promise<void> {
-    if (!this._started) {
-      throw new nodeErrors.ErrorNodeGraphNotStarted();
-    }
-    const bucket: NodeBucket | undefined = await this.getBucketsDb(bucketIndex);
-    if (bucket) {
-      // Remove the node ID from the expected bucket
-      delete bucket[nodeId];
-      // If this is the last node in the bucket, remove entire bucket
-      if (Object.keys(bucket).length == 0) {
-        await this.bucketsDb.del(bucketIndex);
-        // Otherwise, reinsert the bucket back into database (without the node)
-      } else {
-        const data = nodeUtils.serializeGraphValue(this.bucketsDbKey, bucket);
-        await this.bucketsDb.put(bucketIndex, data);
-      }
-    }
-  }
-
-  protected async batchBucketsDb(ops: Array<NodeGraphOp>): Promise<void> {
-    if (!this._started) {
-      throw new nodeErrors.ErrorNodeGraphNotStarted();
-    }
-    const ops_: Array<AbstractBatch> = [];
-    for (const op of ops) {
-      if (op.type === 'del') {
-        ops_.push({
-          type: op.type,
-          key: op.key,
-        });
-      } else if (op.type === 'put') {
-        const ngK = op.key;
-        const data = nodeUtils.serializeGraphValue(this.bucketsDbKey, op.value);
-        ops_.push({
-          type: op.type,
-          key: ngK,
-          value: data,
-        });
-      }
-    }
-    await this.bucketsDb.batch(ops_);
->>>>>>> wip
   }
 }
 
