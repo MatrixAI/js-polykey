@@ -22,6 +22,7 @@ import { errors as vaultErrors } from '@/vaults';
 import * as keysUtils from '@/keys/utils';
 import { utils as networkUtils } from '@/network';
 import { errors as gitErrors } from '@/git';
+import { resolvesZeroIP } from '@/network/utils';
 
 describe('VaultManager is', () => {
   const logger = new Logger('VaultManager Test', LogLevel.WARN, [
@@ -152,10 +153,10 @@ describe('VaultManager is', () => {
   test('able to create and get a vault', async () => {
     await vaultManager.start({});
     const vault = await vaultManager.createVault('MyTestVault');
-    const theVault = vaultManager.getVault(vault.vaultId);
+    const theVault = await vaultManager.getVault(vault.vaultId);
 
     expect(vault).toBe(theVault);
-    expect(() => vaultManager.getVault('DoesNotExist')).toThrow(
+    await expect(vaultManager.getVault('DoesNotExist')).rejects.toThrow(
       vaultErrors.ErrorVaultUndefined,
     );
 
@@ -169,7 +170,7 @@ describe('VaultManager is', () => {
       'BetterVault',
     );
     expect(result).toBe(true);
-    expect(vaultManager.getVault(vault.vaultId)).toBe(vault);
+    await expect(vaultManager.getVault(vault.vaultId)).resolves.toBe(vault);
     await expect(vaultManager.renameVault('DoesNotExist', 'DNE')).rejects.toThrow(
       vaultErrors.ErrorVaultUndefined,
     );
@@ -182,11 +183,9 @@ describe('VaultManager is', () => {
     const thirdVault = await vaultManager.createVault('MyThirdVault');
     const result = await vaultManager.deleteVault(secondVault.vaultId);
     expect(result).toBe(true);
-    expect(vaultManager.getVault(firstVault.vaultId)).toBe(firstVault);
-    expect(() => {
-      vaultManager.getVault(secondVault.vaultId);
-    }).toThrow(`${secondVault.vaultId} does not exist`);
-    expect(vaultManager.getVault(thirdVault.vaultId)).toBe(thirdVault);
+    await expect(vaultManager.getVault(firstVault.vaultId)).resolves.toBe(firstVault);
+    await expect(vaultManager.getVault(secondVault.vaultId)).rejects.toThrow(`${secondVault.vaultId} does not exist`);
+    await expect(vaultManager.getVault(thirdVault.vaultId)).resolves.toBe(thirdVault);
     await vaultManager.stop();
   });
   test('able to list vaults', async () => {
@@ -319,7 +318,7 @@ describe('VaultManager is', () => {
     expect(vaultManager.listVaults().length).toEqual(vaultNames.length);
     await vaultManager.stop();
   });
-  test.only('able to read and load existing metadata', async () => {
+  test('able to read and load existing metadata', async () => {
     const vaultNames = [
       'Vault1',
       'Vault2',
@@ -345,7 +344,7 @@ describe('VaultManager is', () => {
       }
     }
     expect(vaultId).not.toBeUndefined();
-    const vault = vaultManager.getVault(vaultId);
+    const vault = await vaultManager.getVault(vaultId);
     expect(vault).toBeTruthy();
     await vaultManager.stop();
     await gestaltGraph.stop();
@@ -400,7 +399,7 @@ describe('VaultManager is', () => {
     await vaultManager.deleteVault(v5!);
     const v9 = await vaultManager.getVaultId('Vault9');
     expect(v9).toBeTruthy();
-    const vault9 = vaultManager.getVault(v9!);
+    const vault9 = await vaultManager.getVault(v9!);
     await vaultManager.renameVault(v9!, 'Vault10');
     await vaultManager.createVault('ThirdImpact');
     await vaultManager.createVault('Cake');
@@ -422,7 +421,7 @@ describe('VaultManager is', () => {
     await vaultManager.createVault('Pumpkin');
     const v102 = await vaultManager.getVaultId('Vault10');
     expect(v102).toBeTruthy();
-    const secret = await vaultManager.getVault(v102!).getSecret('MySecret');
+    const secret = await (await vaultManager.getVault(v102!)).getSecret('MySecret');
     expect(secret.toString()).toBe('MyActualPassword');
     alteredVaultNames.push('Pumpkin');
     expect(vaultManager.listVaults().length).toEqual(alteredVaultNames.length);
@@ -585,7 +584,7 @@ describe('VaultManager is', () => {
       await expect(vaultManager.getDefaultNode(vault.vaultId)).resolves.toBe(targetNodeId);
       const vaultsList = vaultManager.listVaults();
       expect(vaultsList[0].name).toStrictEqual('MyFirstVault');
-      const clonedVault = vaultManager.getVault(vaultsList[0].id);
+      const clonedVault = await vaultManager.getVault(vaultsList[0].id);
       expect(await clonedVault.getSecret('MyFirstSecret')).toStrictEqual(
         'Success?',
       );
@@ -630,7 +629,7 @@ describe('VaultManager is', () => {
         vaultManager.pullVault(vault.vaultId, targetNodeId),
       ).rejects.toThrow(gitErrors.ErrorGitPermissionDenied);
       const list = vaultManager.listVaults();
-      const clonedVault = vaultManager.getVault(list[0].id);
+      const clonedVault = await vaultManager.getVault(list[0].id);
       expect((await clonedVault.listSecrets()).sort()).toStrictEqual(
         ['MyFirstSecret'].sort(),
       );

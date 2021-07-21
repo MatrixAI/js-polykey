@@ -27,8 +27,6 @@ async function generateVaultKey(bits: number = 256) {
 async function generateVaultId(): Promise<VaultId> {
   const vaultId = uuid();
   return vaultId as VaultId;
-  // const id = await keysUtils.getRandomBytes(32);
-  // return base58.encode(id) as VaultId;
 }
 
 async function fileExists(fs: FileSystem, path): Promise<boolean> {

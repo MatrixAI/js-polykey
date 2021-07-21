@@ -3,10 +3,8 @@ import * as utils from '@/vaults/utils';
 describe('utils', () => {
   test('vaultIds are alphanumeric', async () => {
     const id1 = await utils.generateVaultId();
-    const id2 = utils.generateVaultIdSync();
 
     expect(isAlphaNumeric(id1)).toBe(true);
-    expect(isAlphaNumeric(id2)).toBe(true);
   });
 });
 
