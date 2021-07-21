@@ -84,10 +84,18 @@ export namespace JWTTokenMessage {
 }
 
 export class VaultMessage extends jspb.Message { 
+
+    hasName(): boolean;
+    clearName(): void;
     getName(): string;
     setName(value: string): VaultMessage;
+
+    hasId(): boolean;
+    clearId(): void;
     getId(): string;
     setId(value: string): VaultMessage;
+
+    getNameOrIdCase(): VaultMessage.NameOrIdCase;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): VaultMessage.AsObject;
@@ -104,76 +112,104 @@ export namespace VaultMessage {
         name: string,
         id: string,
     }
+
+    export enum NameOrIdCase {
+        NAMEORID_NOT_SET = 0,
+        NAME = 1,
+        ID = 2,
+    }
+
 }
 
-export class VaultSpecificMessage extends jspb.Message { 
+export class VaultRenameMessage extends jspb.Message { 
 
     hasVault(): boolean;
     clearVault(): void;
     getVault(): VaultMessage | undefined;
-    setVault(value?: VaultMessage): VaultSpecificMessage;
-    getName(): string;
-    setName(value: string): VaultSpecificMessage;
+    setVault(value?: VaultMessage): VaultRenameMessage;
+    getNewname(): string;
+    setNewname(value: string): VaultRenameMessage;
 
     serializeBinary(): Uint8Array;
-    toObject(includeInstance?: boolean): VaultSpecificMessage.AsObject;
-    static toObject(includeInstance: boolean, msg: VaultSpecificMessage): VaultSpecificMessage.AsObject;
+    toObject(includeInstance?: boolean): VaultRenameMessage.AsObject;
+    static toObject(includeInstance: boolean, msg: VaultRenameMessage): VaultRenameMessage.AsObject;
     static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
     static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
-    static serializeBinaryToWriter(message: VaultSpecificMessage, writer: jspb.BinaryWriter): void;
-    static deserializeBinary(bytes: Uint8Array): VaultSpecificMessage;
-    static deserializeBinaryFromReader(message: VaultSpecificMessage, reader: jspb.BinaryReader): VaultSpecificMessage;
+    static serializeBinaryToWriter(message: VaultRenameMessage, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): VaultRenameMessage;
+    static deserializeBinaryFromReader(message: VaultRenameMessage, reader: jspb.BinaryReader): VaultRenameMessage;
 }
 
-export namespace VaultSpecificMessage {
+export namespace VaultRenameMessage {
     export type AsObject = {
         vault?: VaultMessage.AsObject,
-        name: string,
+        newname: string,
     }
 }
 
-export class SecretSpecificMessage extends jspb.Message { 
+export class VaultMkdirMessage extends jspb.Message { 
 
     hasVault(): boolean;
     clearVault(): void;
-    getVault(): VaultSpecificMessage | undefined;
-    setVault(value?: VaultSpecificMessage): SecretSpecificMessage;
-    getContent(): string;
-    setContent(value: string): SecretSpecificMessage;
+    getVault(): VaultMessage | undefined;
+    setVault(value?: VaultMessage): VaultMkdirMessage;
+    getDirname(): string;
+    setDirname(value: string): VaultMkdirMessage;
 
     serializeBinary(): Uint8Array;
-    toObject(includeInstance?: boolean): SecretSpecificMessage.AsObject;
-    static toObject(includeInstance: boolean, msg: SecretSpecificMessage): SecretSpecificMessage.AsObject;
+    toObject(includeInstance?: boolean): VaultMkdirMessage.AsObject;
+    static toObject(includeInstance: boolean, msg: VaultMkdirMessage): VaultMkdirMessage.AsObject;
     static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
     static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
-    static serializeBinaryToWriter(message: SecretSpecificMessage, writer: jspb.BinaryWriter): void;
-    static deserializeBinary(bytes: Uint8Array): SecretSpecificMessage;
-    static deserializeBinaryFromReader(message: SecretSpecificMessage, reader: jspb.BinaryReader): SecretSpecificMessage;
+    static serializeBinaryToWriter(message: VaultMkdirMessage, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): VaultMkdirMessage;
+    static deserializeBinaryFromReader(message: VaultMkdirMessage, reader: jspb.BinaryReader): VaultMkdirMessage;
 }
 
-export namespace SecretSpecificMessage {
+export namespace VaultMkdirMessage {
     export type AsObject = {
-        vault?: VaultSpecificMessage.AsObject,
-        content: string,
+        vault?: VaultMessage.AsObject,
+        dirname: string,
+    }
+}
+
+export class VaultPullMessage extends jspb.Message { 
+
+    hasVault(): boolean;
+    clearVault(): void;
+    getVault(): VaultMessage | undefined;
+    setVault(value?: VaultMessage): VaultPullMessage;
+
+    hasNode(): boolean;
+    clearNode(): void;
+    getNode(): NodeMessage | undefined;
+    setNode(value?: NodeMessage): VaultPullMessage;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): VaultPullMessage.AsObject;
+    static toObject(includeInstance: boolean, msg: VaultPullMessage): VaultPullMessage.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: VaultPullMessage, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): VaultPullMessage;
+    static deserializeBinaryFromReader(message: VaultPullMessage, reader: jspb.BinaryReader): VaultPullMessage;
+}
+
+export namespace VaultPullMessage {
+    export type AsObject = {
+        vault?: VaultMessage.AsObject,
+        node?: NodeMessage.AsObject,
     }
 }
 
 export class SecretRenameMessage extends jspb.Message { 
 
-    hasVault(): boolean;
-    clearVault(): void;
-    getVault(): VaultMessage | undefined;
-    setVault(value?: VaultMessage): SecretRenameMessage;
-
-    hasOldname(): boolean;
-    clearOldname(): void;
-    getOldname(): SecretMessage | undefined;
-    setOldname(value?: SecretMessage): SecretRenameMessage;
-
-    hasNewname(): boolean;
-    clearNewname(): void;
-    getNewname(): SecretMessage | undefined;
-    setNewname(value?: SecretMessage): SecretRenameMessage;
+    hasOldsecret(): boolean;
+    clearOldsecret(): void;
+    getOldsecret(): SecretMessage | undefined;
+    setOldsecret(value?: SecretMessage): SecretRenameMessage;
+    getNewname(): string;
+    setNewname(value: string): SecretRenameMessage;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): SecretRenameMessage.AsObject;
@@ -187,44 +223,21 @@ export class SecretRenameMessage extends jspb.Message {
 
 export namespace SecretRenameMessage {
     export type AsObject = {
-        vault?: VaultMessage.AsObject,
-        oldname?: SecretMessage.AsObject,
-        newname?: SecretMessage.AsObject,
-    }
-}
-
-export class SecretNewMessage extends jspb.Message { 
-
-    hasVault(): boolean;
-    clearVault(): void;
-    getVault(): VaultMessage | undefined;
-    setVault(value?: VaultMessage): SecretNewMessage;
-    getName(): string;
-    setName(value: string): SecretNewMessage;
-    getContent(): string;
-    setContent(value: string): SecretNewMessage;
-
-    serializeBinary(): Uint8Array;
-    toObject(includeInstance?: boolean): SecretNewMessage.AsObject;
-    static toObject(includeInstance: boolean, msg: SecretNewMessage): SecretNewMessage.AsObject;
-    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
-    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
-    static serializeBinaryToWriter(message: SecretNewMessage, writer: jspb.BinaryWriter): void;
-    static deserializeBinary(bytes: Uint8Array): SecretNewMessage;
-    static deserializeBinaryFromReader(message: SecretNewMessage, reader: jspb.BinaryReader): SecretNewMessage;
-}
-
-export namespace SecretNewMessage {
-    export type AsObject = {
-        vault?: VaultMessage.AsObject,
-        name: string,
-        content: string,
+        oldsecret?: SecretMessage.AsObject,
+        newname: string,
     }
 }
 
 export class SecretMessage extends jspb.Message { 
+
+    hasVault(): boolean;
+    clearVault(): void;
+    getVault(): VaultMessage | undefined;
+    setVault(value?: VaultMessage): SecretMessage;
     getName(): string;
     setName(value: string): SecretMessage;
+    getContent(): string;
+    setContent(value: string): SecretMessage;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): SecretMessage.AsObject;
@@ -238,7 +251,61 @@ export class SecretMessage extends jspb.Message {
 
 export namespace SecretMessage {
     export type AsObject = {
+        vault?: VaultMessage.AsObject,
         name: string,
+        content: string,
+    }
+}
+
+export class SecretEditMessage extends jspb.Message { 
+
+    hasSecret(): boolean;
+    clearSecret(): void;
+    getSecret(): SecretMessage | undefined;
+    setSecret(value?: SecretMessage): SecretEditMessage;
+    getContent(): string;
+    setContent(value: string): SecretEditMessage;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): SecretEditMessage.AsObject;
+    static toObject(includeInstance: boolean, msg: SecretEditMessage): SecretEditMessage.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: SecretEditMessage, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): SecretEditMessage;
+    static deserializeBinaryFromReader(message: SecretEditMessage, reader: jspb.BinaryReader): SecretEditMessage;
+}
+
+export namespace SecretEditMessage {
+    export type AsObject = {
+        secret?: SecretMessage.AsObject,
+        content: string,
+    }
+}
+
+export class SecretDirectoryMessage extends jspb.Message { 
+
+    hasVault(): boolean;
+    clearVault(): void;
+    getVault(): SecretMessage | undefined;
+    setVault(value?: SecretMessage): SecretDirectoryMessage;
+    getSecretdirectory(): string;
+    setSecretdirectory(value: string): SecretDirectoryMessage;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): SecretDirectoryMessage.AsObject;
+    static toObject(includeInstance: boolean, msg: SecretDirectoryMessage): SecretDirectoryMessage.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: SecretDirectoryMessage, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): SecretDirectoryMessage;
+    static deserializeBinaryFromReader(message: SecretDirectoryMessage, reader: jspb.BinaryReader): SecretDirectoryMessage;
+}
+
+export namespace SecretDirectoryMessage {
+    export type AsObject = {
+        vault?: SecretMessage.AsObject,
+        secretdirectory: string,
     }
 }
 
@@ -262,29 +329,90 @@ export namespace StatMessage {
     }
 }
 
-export class ShareMessage extends jspb.Message { 
-    getName(): string;
-    setName(value: string): ShareMessage;
-    getId(): string;
-    setId(value: string): ShareMessage;
-    getSet(): boolean;
-    setSet(value: boolean): ShareMessage;
+export class SetVaultPermMessage extends jspb.Message { 
+
+    hasVault(): boolean;
+    clearVault(): void;
+    getVault(): VaultMessage | undefined;
+    setVault(value?: VaultMessage): SetVaultPermMessage;
+
+    hasNode(): boolean;
+    clearNode(): void;
+    getNode(): NodeMessage | undefined;
+    setNode(value?: NodeMessage): SetVaultPermMessage;
 
     serializeBinary(): Uint8Array;
-    toObject(includeInstance?: boolean): ShareMessage.AsObject;
-    static toObject(includeInstance: boolean, msg: ShareMessage): ShareMessage.AsObject;
+    toObject(includeInstance?: boolean): SetVaultPermMessage.AsObject;
+    static toObject(includeInstance: boolean, msg: SetVaultPermMessage): SetVaultPermMessage.AsObject;
     static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
     static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
-    static serializeBinaryToWriter(message: ShareMessage, writer: jspb.BinaryWriter): void;
-    static deserializeBinary(bytes: Uint8Array): ShareMessage;
-    static deserializeBinaryFromReader(message: ShareMessage, reader: jspb.BinaryReader): ShareMessage;
+    static serializeBinaryToWriter(message: SetVaultPermMessage, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): SetVaultPermMessage;
+    static deserializeBinaryFromReader(message: SetVaultPermMessage, reader: jspb.BinaryReader): SetVaultPermMessage;
 }
 
-export namespace ShareMessage {
+export namespace SetVaultPermMessage {
     export type AsObject = {
-        name: string,
-        id: string,
-        set: boolean,
+        vault?: VaultMessage.AsObject,
+        node?: NodeMessage.AsObject,
+    }
+}
+
+export class UnsetVaultPermMessage extends jspb.Message { 
+
+    hasVault(): boolean;
+    clearVault(): void;
+    getVault(): VaultMessage | undefined;
+    setVault(value?: VaultMessage): UnsetVaultPermMessage;
+
+    hasNode(): boolean;
+    clearNode(): void;
+    getNode(): NodeMessage | undefined;
+    setNode(value?: NodeMessage): UnsetVaultPermMessage;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): UnsetVaultPermMessage.AsObject;
+    static toObject(includeInstance: boolean, msg: UnsetVaultPermMessage): UnsetVaultPermMessage.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: UnsetVaultPermMessage, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): UnsetVaultPermMessage;
+    static deserializeBinaryFromReader(message: UnsetVaultPermMessage, reader: jspb.BinaryReader): UnsetVaultPermMessage;
+}
+
+export namespace UnsetVaultPermMessage {
+    export type AsObject = {
+        vault?: VaultMessage.AsObject,
+        node?: NodeMessage.AsObject,
+    }
+}
+
+export class GetVaultPermMessage extends jspb.Message { 
+
+    hasVault(): boolean;
+    clearVault(): void;
+    getVault(): VaultMessage | undefined;
+    setVault(value?: VaultMessage): GetVaultPermMessage;
+
+    hasNode(): boolean;
+    clearNode(): void;
+    getNode(): NodeMessage | undefined;
+    setNode(value?: NodeMessage): GetVaultPermMessage;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): GetVaultPermMessage.AsObject;
+    static toObject(includeInstance: boolean, msg: GetVaultPermMessage): GetVaultPermMessage.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: GetVaultPermMessage, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): GetVaultPermMessage;
+    static deserializeBinaryFromReader(message: GetVaultPermMessage, reader: jspb.BinaryReader): GetVaultPermMessage;
+}
+
+export namespace GetVaultPermMessage {
+    export type AsObject = {
+        vault?: VaultMessage.AsObject,
+        node?: NodeMessage.AsObject,
     }
 }
 

@@ -30,10 +30,10 @@ service Client {
   // Vaults
   rpc VaultsList(EmptyMessage) returns (stream VaultMessage) {};
   rpc VaultsCreate(VaultMessage) returns (VaultMessage) {};
-  rpc VaultsRename(VaultSpecificMessage) returns (VaultMessage) {};
+  rpc VaultsRename(VaultRenameMessage) returns (VaultMessage) {};
   rpc VaultsDelete(VaultMessage) returns (StatusMessage) {};
   rpc VaultsListSecrets(VaultMessage) returns (stream SecretMessage) {};
-  rpc VaultsMkdir(VaultSpecificMessage) returns (StatusMessage) {};
+  rpc VaultsMkdir(VaultMkdirMessage) returns (StatusMessage) {};
   rpc VaultsStat(VaultMessage) returns (StatMessage) {};
   rpc VaultsPull(VaultPullMessage) returns (StatusMessage) {};
   rpc VaultsScan(NodeMessage) returns (stream VaultMessage) {};
@@ -42,9 +42,10 @@ service Client {
   rpc VaultsGetSecret(SecretMessage) returns (SecretMessage) {};
   rpc VaultsRenameSecret(SecretRenameMessage) returns (StatusMessage) {};
   rpc VaultsNewSecret(SecretMessage) returns (StatusMessage) {};
-  rpc VaultsNewDirSecret(SecretSpecificMessage) returns (StatusMessage) {};
-  rpc VaultsShare(ShareMessage) returns (EmptyMessage) {};
-  rpc VaultsPermissions(ShareMessage) returns (stream PermissionMessage) {};
+  rpc VaultsNewDirSecret(SecretDirectoryMessage) returns (StatusMessage) {};
+  rpc SetVaultPerms(SetVaultPermMessage) returns (StatusMessage) {};
+  rpc UnsetVaultPerms(UnsetVaultPermMessage) returns (StatusMessage) {}
+  rpc VaultsPermissions(GetVaultPermMessage) returns (stream PermissionMessage) {};
 
   // Identities
   rpc IdentitiesAuthenticate(ProviderMessage) returns (ProviderMessage) {};
@@ -82,20 +83,25 @@ message JWTTokenMessage {
 // Vaults
 
 message VaultMessage {
-  oneof name_or_id {
+  oneof nameOrId {
     string name = 1;
     string id = 2;
   }
 }
 
-message VaultSpecificMessage {
-  required VaultMessage vault = 1;
-  string name = 2;
+message VaultRenameMessage {
+  VaultMessage vault = 1;
+  string newName = 2;
+}
+
+message VaultMkdirMessage {
+  VaultMessage vault = 1;
+  string dirName = 2;
 }
 
 message VaultPullMessage {
-  required VaultMessage vault = 1;
-  required NodeMessage node = 2;
+  VaultMessage vault = 1;
+  NodeMessage node = 2;
 }
 
 message SecretRenameMessage {
@@ -114,19 +120,28 @@ message SecretEditMessage {
   string content = 2;
 }
 
-message SecretSpecificMessage {
+message SecretDirectoryMessage {
   SecretMessage vault = 1;
-  string content = 2;
+  string secretDirectory = 2;
 }
 
 message StatMessage {
   string stats = 1;
 }
 
-message ShareMessage {
-  string name = 1;
-  string id = 2;
-  bool set = 3;
+message SetVaultPermMessage {
+  VaultMessage vault = 1;
+  NodeMessage node = 2;
+}
+
+message UnsetVaultPermMessage {
+  VaultMessage vault = 1;
+  NodeMessage node = 2;
+}
+
+message GetVaultPermMessage {
+  VaultMessage vault = 1;
+  NodeMessage node = 2;
 }
 
 message PermissionMessage {
