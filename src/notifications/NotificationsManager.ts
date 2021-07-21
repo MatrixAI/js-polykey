@@ -1,7 +1,7 @@
 import type { NotificationId } from './types';
 import type { ACL } from '../acl';
 import type { DB } from '../db';
-//import type { NodeManager } from '../nodes';
+import type { NodeManager } from '../nodes';
 import type { WorkerManager } from '../workers';
 import type { DBLevel, DBOp } from '../db/types';
 import type { NodeId } from '../nodes/types';
@@ -20,7 +20,7 @@ class NotificationsManager {
   protected logger: Logger;
   protected acl: ACL;
   protected db: DB;
-  //protected nodeManager: NodeManager;
+  protected nodeManager: NodeManager;
   protected workerManager?: WorkerManager;
   protected notificationsDbDomain: Array<string> = [this.constructor.name, 'numMessages'];
   protected notificationsMessagesDbDomain: Array<string> = [this.notificationsDbDomain[0], 'messages'];
@@ -29,11 +29,11 @@ class NotificationsManager {
   protected lock: Mutex = new Mutex();
   protected _started: boolean = false;
 
-  constructor({ acl, db, /*nodeManager,*/ logger }: { acl: ACL; db: DB; /*nodeManager: NodeManager;*/ logger?: Logger }) {
+  constructor({ acl, db, nodeManager, logger }: { acl: ACL; db: DB; nodeManager: NodeManager; logger?: Logger }) {
     this.logger = logger ?? new Logger(this.constructor.name);
     this.acl = acl;
     this.db = db;
-    //this.nodeManager = nodeManager;
+    this.nodeManager = nodeManager;
   }
 
 
@@ -83,8 +83,34 @@ class NotificationsManager {
   }
 
   /**
-   * Send a notification
+   * Run several operations within the same lock
+   * This does not ensure atomicity of the underlying database
+   * Database atomicity still depends on the underlying operation
+   */
+  public async transaction<T>(f: (notificationsManager: NotificationsManager) => Promise<T>): Promise<T> {
+    const release = await this.lock.acquire();
+    try {
+      return await f(this);
+    } finally {
+      release();
+    }
+  }
 
+  /**
+   * Transaction wrapper that will not lock if the operation was executed
+   * within a transaction context
+   */
+  public async _transaction<T>(f: () => Promise<T>): Promise<T> {
+    if (this.lock.isLocked()) {
+      return await f();
+    } else {
+      return await this.transaction(f);
+    }
+  }
+
+  /**
+   * Send a notification
+   */
   public async sendMessage(
     nodeId: NodeId,
     message: string,
@@ -97,7 +123,6 @@ class NotificationsManager {
     const client = this.nodeManager.getClient(nodeId);
     // NodeManager will send message...
   }
-   */
 
   /**
    * Receive a notification
@@ -176,35 +201,22 @@ class NotificationsManager {
     return oldestMessage;
   }
 
-  protected async getOldestMessage(): Promise<NotificationId | undefined> {
-    const messages: Record<NotificationId, Record<NotificationId, string>> = {};
-    for await (const o of this.notificationsMessagesDb.createReadStream()) {
-      const notifId = (o as any).key as NotificationId;
-      const data = (o as any).value as Buffer;
-      const message = this.db.unserializeDecrypt<string>(data);
-      let notification: Record<NotificationId, string>;
-      if (message in messages) {
-        notification = messages[message];
-        let msgContents: string;
-        for (const notifId_ in notification) {
-          msgContents = notification[notifId_];
-          break;
-        }
-        notification[notifId] = msgContents!;
-      } else {
-        const msgRef = (await this.db.get(
-          this.notificationsMessagesDbDomain,
-          notifId,
-        )) as Ref<string>;
-        notification = { [notifId]: msgRef.object };
-        messages[message] = notification;
+  public async getNotifications(): Promise<Array<Record<NotificationId, string>>> {
+    return await this._transaction(async () => {
+      const notifications: Array<Record<NotificationId, string>> = [];
+      for await (const o of this.notificationsMessagesDb.createReadStream()) {
+        const notifId = (o as any).key as NotificationId;
+        const data = (o as any).value as Buffer;
+        const message = this.db.unserializeDecrypt<string>(data);
+        let notification: Record<NotificationId, string> = { [notifId]: message };
+        notifications.push(notification);
       }
-    }
-    const notifications: Array<Record<NotificationId, string>> = [];
-    for (const message in messages) {
-      notifications.push(messages[message]);
-    }
-    return notifications[0][0];
+      return notifications;
+    });
+  }
+
+  public async getOldestMessage(): Promise<NotificationId | undefined> {
+    return undefined;
   }
 
   protected async removeOldestMessage(
