@@ -1,8 +1,8 @@
-import type { NotificationId } from './types';
+import mlts from 'monotonic-lexicographic-timestamp';
 
 function generateNotifId(): string {
-  const mlts = require('monotonic-lexicographic-timestamp')();
-  return mlts();
+  const timestamp = mlts();
+  return timestamp();
 }
 
 export { generateNotifId };
