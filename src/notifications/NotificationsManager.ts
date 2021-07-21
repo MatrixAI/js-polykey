@@ -40,7 +40,17 @@ class NotificationsManager {
   protected lock: Mutex = new Mutex();
   protected _started: boolean = false;
 
-  constructor({ acl, db, nodeManager, logger }: { acl: ACL; db: DB; nodeManager: NodeManager; logger?: Logger }) {
+  constructor({
+    acl,
+    db,
+    nodeManager,
+    logger,
+  }: {
+    acl: ACL;
+    db: DB;
+    nodeManager: NodeManager;
+    logger?: Logger;
+  }) {
     this.logger = logger ?? new Logger(this.constructor.name);
     this.acl = acl;
     this.db = db;
@@ -102,7 +112,9 @@ class NotificationsManager {
    * This does not ensure atomicity of the underlying database
    * Database atomicity still depends on the underlying operation
    */
-  public async transaction<T>(f: (notificationsManager: NotificationsManager) => Promise<T>): Promise<T> {
+  public async transaction<T>(
+    f: (notificationsManager: NotificationsManager) => Promise<T>,
+  ): Promise<T> {
     const release = await this.lock.acquire();
     try {
       return await f(this);
@@ -126,10 +138,7 @@ class NotificationsManager {
   /**
    * Send a notification
    */
-  public async sendMessage(
-    nodeId: NodeId,
-    message: string,
-  ) {
+  public async sendMessage(nodeId: NodeId, message: string) {
     const nodeAddress = await this.nodeManager.getNode(nodeId);
     if (nodeAddress === undefined) {
       throw new notificationsErrors.ErrorNotificationsNodeNotFound();
@@ -216,14 +225,18 @@ class NotificationsManager {
     return oldestMessage;
   }
 
-  public async getNotifications(): Promise<Array<Record<NotificationId, string>>> {
+  public async getNotifications(): Promise<
+    Array<Record<NotificationId, string>>
+  > {
     return await this._transaction(async () => {
       const notifications: Array<Record<NotificationId, string>> = [];
       for await (const o of this.notificationsMessagesDb.createReadStream()) {
         const notifId = (o as any).key as NotificationId;
         const data = (o as any).value as Buffer;
         const message = this.db.unserializeDecrypt<string>(data);
-        let notification: Record<NotificationId, string> = { [notifId]: message };
+        const notification: Record<NotificationId, string> = {
+          [notifId]: message,
+        };
         notifications.push(notification);
       }
       return notifications;
