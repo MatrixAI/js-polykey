@@ -31,11 +31,11 @@ type Packfile = {
 };
 
 type TreeObj = {
-  mode: string;
-  path: string;
-  oid: string;
-  type: string;
+  oid?: string;
+  mode?: string;
+  path?: string;
   sha?: string;
+  buffer: Buffer;
 }
 
 type Pack = {
@@ -46,10 +46,15 @@ type Pack = {
 }
 
 type Commit = {
-  type: string;
+  type?: string;
+  format?: string;
+  source?: string;
+  object: TreeObj;
+}
+
+type Wrap = {
   oid: string;
-  object;
-  error;
+  buffer: Buffer;
 }
 
 type BufferEncoding =
@@ -73,4 +78,6 @@ export type {
   BufferEncoding,
   TreeObj,
   Pack,
+  Commit,
+  Wrap,
 };

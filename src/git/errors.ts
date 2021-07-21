@@ -18,6 +18,8 @@ class ErrorGitType extends ErrorGit {}
 
 class ErrorGitInvalidSha extends ErrorGit {}
 
+class ErrorGitReadObject extends ErrorGit {}
+
 export {
   ErrorGit,
   ErrorRepositoryUndefined,
@@ -28,4 +30,5 @@ export {
   ErrorGitBufferParse,
   ErrorGitType,
   ErrorGitInvalidSha,
+  ErrorGitReadObject,
 };

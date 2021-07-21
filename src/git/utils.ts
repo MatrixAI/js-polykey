@@ -6,6 +6,9 @@ import type {
   BufferEncoding,
   TreeObj,
   Pack,
+  Commit,
+  Wrap,
+  Blobs,
 } from './types';
 
 import { EncryptedFS } from 'encryptedfs';
@@ -346,7 +349,7 @@ async function listObjects(
   return [...commits, ...trees, ...blobs];
 }
 
-function treeFrom(entries: TreeObj): Array<TreeObj> {
+function treeFrom(entries: Blobs): Array<TreeObj> {
   let entriesa: Array<TreeObj> = [];
   if (Buffer.isBuffer(entries)) {
     entriesa = parseBuffer(entries);
@@ -358,7 +361,7 @@ function treeFrom(entries: TreeObj): Array<TreeObj> {
   return entriesa;
 }
 
-function nudgeIntoShape(entry: TreeObj): TreeObj {
+function nudgeIntoShape(entry: Blobs): TreeObj {
   if (!entry.oid && entry.sha) {
     entry.oid = entry.sha; // Github
   }
@@ -416,13 +419,13 @@ async function log(
   depth: number | undefined,
   since: number | undefined, // Date
   signing = false,
-) {
+): Promise<Array<Commit>> {
   try {
     const sinceTimestamp =
       since === undefined ? undefined : Math.floor(since.valueOf() / 1000);
     // TODO: In the future, we may want to have an API where we return a
     // async iterator that emits commits.
-    const commits: any[] = [];
+    const commits: Commit[] = [];
     const oid = await resolve(fs, gitdir, ref);
     const tips = [await logCommit(fs, gitdir, oid, signing)];
 
@@ -662,7 +665,7 @@ async function read(
   gitdir: string,
   oid: string,
   format = 'content',
-) {
+): Promise<Commit> {
   const readFile = utils.promisify(fs.readFile).bind(fs);
   const readdir = utils.promisify(fs.readdir).bind(fs);
   // Look for it in the loose object directory.
@@ -699,42 +702,43 @@ async function read(
   }
   // Check to see if it's in shallow commits.
   if (!file) {
-    const text = await readFile(path.join(gitdir, 'shallow'), {
+    const text: string = await readFile(path.join(gitdir, 'shallow'), {
       encoding: 'utf8',
     });
     if (text !== null && text.includes(oid)) {
-      throw new Error(`ReadShallowObjectFail: ${oid}`);
+      throw new gitErrors.ErrorGitReadObject(`ReadShallowObjectFail: ${oid}`);
     }
   }
   // Finally
   if (!file) {
-    throw new Error(`ReadObjectFail: ${oid}`);
+    throw new gitErrors.ErrorGitReadObject(`ReadObjectFail: ${oid}`);
   }
   if (format === 'deflated') {
     return { format: 'deflated', object: file, source };
   }
   const buffer = Buffer.from(pako.inflate(file));
   if (format === 'wrapped') {
-    return { format: 'wrapped', object: buffer, source };
+    return { format: 'wrapped', object: { buffer }, source };
   }
   const { type, object } = unwrap({ oid, buffer });
   if (format === 'content') return { type, format: 'content', object, source };
+  throw new gitErrors.ErrorGitReadObject(`Unsupported format type: ${format}`);
 }
 
-function unwrap({ oid, buffer }) {
-  if (oid) {
-    const sha = new Hash().update(buffer).digest('hex');
-    if (sha !== oid) {
+function unwrap(wrap: Wrap): Commit {
+  if (wrap.oid) {
+    const sha = new Hash().update(wrap.buffer).digest('hex');
+    if (sha !== wrap.oid) {
       throw new gitErrors.ErrorGitInvalidSha(
-        `SHA check failed! Expected ${oid}, computed ${sha}`
+        `SHA check failed! Expected ${wrap.oid}, computed ${sha}`
       );
     }
   }
-  const s = buffer.indexOf(32); // first space
-  const i = buffer.indexOf(0); // first null value
-  const type = buffer.slice(0, s).toString('utf8'); // get type of object
-  const length = buffer.slice(s + 1, i).toString('utf8'); // get type of object
-  const actualLength = buffer.length - (i + 1);
+  const s = wrap.buffer.indexOf(32); // first space
+  const i = wrap.buffer.indexOf(0); // first null value
+  const type = wrap.buffer.slice(0, s).toString('utf8'); // get type of object
+  const length = wrap.buffer.slice(s + 1, i).toString('utf8'); // get type of object
+  const actualLength = wrap.buffer.length - (i + 1);
   // verify length
   if (parseInt(length) !== actualLength) {
     throw new gitErrors.ErrorGitType(
@@ -742,8 +746,8 @@ function unwrap({ oid, buffer }) {
     );
   }
   return {
-    type,
-    object: Buffer.from(buffer.slice(i + 1)),
+    type: type,
+    object: { buffer: Buffer.from(wrap.buffer.slice(i + 1)) },
   };
 }
 
