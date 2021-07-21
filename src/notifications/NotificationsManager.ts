@@ -22,20 +22,38 @@ class NotificationsManager {
   protected db: DB;
   //protected nodeManager: NodeManager;
   protected workerManager?: WorkerManager;
-  protected notificationsDbDomain: Array<string> = [this.constructor.name, 'numMessages'];
-  protected notificationsMessagesDbDomain: Array<string> = [this.notificationsDbDomain[0], 'messages'];
+
+  protected readonly MESSAGE_COUNT_KEY: string = 'numMessages';
+
+  protected notificationsDomain: string = this.constructor.name;
+  protected notificationsDbDomain: Array<string> = [this.notificationsDomain];
+  protected notificationsMessagesDbDomain: Array<string> = [
+    this.notificationsDomain,
+    'messages',
+  ];
+
+  // protected notificationsDbDomain: Array<string> = [this.constructor.name, 'numMessages'];
+  // protected notificationsMessagesDbDomain: Array<string> = [this.notificationsDbDomain[0], 'messages'];
+
   protected notificationsDb: DBLevel<string>;
   protected notificationsMessagesDb: DBLevel<NotificationId>;
   protected lock: Mutex = new Mutex();
   protected _started: boolean = false;
 
-  constructor({ acl, db, /*nodeManager,*/ logger }: { acl: ACL; db: DB; /*nodeManager: NodeManager;*/ logger?: Logger }) {
+  constructor({
+    acl,
+    db,
+    /*nodeManager,*/ logger,
+  }: {
+    acl: ACL;
+    db: DB;
+    /*nodeManager: NodeManager;*/ logger?: Logger;
+  }) {
     this.logger = logger ?? new Logger(this.constructor.name);
     this.acl = acl;
     this.db = db;
     //this.nodeManager = nodeManager;
   }
-
 
   public async start({
     fresh = false,
@@ -52,10 +70,15 @@ class NotificationsManager {
         throw new dbErrors.ErrorDBNotStarted();
       }
       // sub-level stores 'numMessages' -> number (of messages)
+
       const notificationsDb = await this.db.level<string>(
-        this.notificationsDbDomain[1],
-        this.db.db,
+        this.notificationsDomain,
       );
+      // const notificationsDb = await this.db.level<string>(
+      //   this.notificationsDbDomain[1],
+      //   this.db.db,
+      // );
+
       // sub-sub-level stores NotificationId -> string (message)
       const notificationsMessagesDb = await this.db.level<NotificationId>(
         this.notificationsMessagesDbDomain[1],
@@ -112,41 +135,41 @@ class NotificationsManager {
     //}
     // Only keep the message if the sending node has the correct permissions
     //if (nodePerms.gestalt.notify) {
-      // If the number stored in notificationsDb >= 10000
-      let numMessages = await this.db.get<string>(
-        this.notificationsDbDomain,
-        'numMessages',
-      );
-      if (numMessages === undefined) {
-        numMessages = '0';
-        await this.db.put<string>(
-          this.notificationsDbDomain,
-          'numMessages',
-          '0',
-        );
-      }
-      if (+numMessages >= 10000) {
-        // Remove the oldest notification from notificationsMessagesDb
-        const oldestMessageId = await this.getOldestMessage();
-        if (oldestMessageId === undefined) {
-          throw new notificationsErrors.ErrorNotificationsDb();
-        }
-        await this.removeOldestMessage(oldestMessageId, numMessages);
-      }
-      // Store the new notification in notificationsMessagesDb
-      const notificationId = notificationsUtils.generateNotifId();
-      await this.db.put<string>(
-        this.notificationsMessagesDbDomain,
-        notificationId,
-        message,
-      );
-      // Number of messages += 1
-      const newNumMessages = +numMessages + 1;
+    // If the number stored in notificationsDb >= 10000
+    let numMessages = await this.db.get<string>(
+      this.notificationsDbDomain,
+      this.MESSAGE_COUNT_KEY,
+    );
+    if (numMessages === undefined) {
+      numMessages = '0';
       await this.db.put<string>(
         this.notificationsDbDomain,
-        'numMessages',
-        String(newNumMessages),
+        this.MESSAGE_COUNT_KEY,
+        '0',
       );
+    }
+    if (+numMessages >= 10000) {
+      // Remove the oldest notification from notificationsMessagesDb
+      const oldestMessageId = await this.getOldestMessage();
+      if (oldestMessageId === undefined) {
+        throw new notificationsErrors.ErrorNotificationsDb();
+      }
+      await this.removeOldestMessage(oldestMessageId, numMessages);
+    }
+    // Store the new notification in notificationsMessagesDb
+    const notificationId = notificationsUtils.generateNotifId();
+    await this.db.put<string>(
+      this.notificationsMessagesDbDomain,
+      notificationId,
+      message,
+    );
+    // Number of messages += 1
+    const newNumMessages = +numMessages + 1;
+    await this.db.put<string>(
+      this.notificationsDbDomain,
+      this.MESSAGE_COUNT_KEY,
+      newNumMessages.toString(),
+    );
     //}
   }
 
@@ -160,7 +183,7 @@ class NotificationsManager {
     }
     const numMessages = await this.db.get<string>(
       this.notificationsDbDomain,
-      'numMessages',
+      this.MESSAGE_COUNT_KEY,
     );
     if (numMessages === undefined) {
       return undefined;
@@ -226,7 +249,6 @@ class NotificationsManager {
     ];
     await this.db.batch(ops);
   }
-
 }
 
 export default NotificationsManager;
