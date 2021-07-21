@@ -247,10 +247,8 @@ class VaultManager {
   public async getVault(vaultId: string): Promise<Vault> {
     if (!this.vaults[vaultId]) {
       await this.setupVault(vaultId);
-      throw Error();
-    } else {
-      return this.vaults[vaultId];
     }
+    return this.vaults[vaultId];
   }
 
   /**
@@ -649,6 +647,24 @@ class VaultManager {
   }
 
   /**
+   * Gets the vault key for a given vault id
+   */
+   private async getVaultKeyByVaultId(
+    vaultId: VaultId,
+  ): Promise<Buffer | undefined> {
+    return await this._transaction(async () => {
+      const vaultKey = await this.db.get<Buffer>(
+        this.vaultsKeysDbDomain,
+        vaultId,
+      );
+      if (vaultKey == null) {
+        return;
+      }
+      return vaultKey;
+    });
+  }
+
+  /**
    * Gets the vault link for a given vault id
    */
   private async getVaultNodeByVaultId(
@@ -783,15 +799,32 @@ class VaultManager {
 
   private async setupVault(vaultId: string) {
     return await this._transaction(async () => {
-      // const vaultName = await this.getVaultIdByVaultName
+      let vaultName: string = '';
+
+      for await (const o of this.vaultsNamesDb.createReadStream({})) {
+        const vId = (o as any).value;
+        const name = (o as any).key as string;
+        const id = this.db.unserializeDecrypt<VaultId>(vId) as string;
+        if(vaultId === id) {
+          vaultName = name;
+          break;
+        }
+      }
+      if(vaultName === '') {
+        throw new vaultErrors.ErrorVaultUndefined();
+      }
+      const vaultKey = await this.getVaultKeyByVaultId(vaultId as VaultId);
+      if(!vaultKey) {
+        throw new vaultErrors.ErrorVaultUndefined();
+      }
       this.vaults[vaultId] = new Vault({
           vaultId: vaultId,
-          vaultName: 'name',
+          vaultName: vaultName,
           baseDir: path.join(this.vaultsPath, vaultId),
           fs: fs,
           logger: this.logger,
         });
-      // this.vaults[vaultId].start({ key: vaultKey });
+      this.vaults[vaultId].start({ key: vaultKey });
     });
   }
 

@@ -1,5 +1,5 @@
 import type { NodeId, NodeAddress, NodeInfo } from '@/nodes/types';
-import { ProviderId, IdentityId, IdentityInfo } from '@/identities/types';
+import { ProviderId, IdentityId, IdentityInfo, IdentityClaims } from '@/identities/types';
 import type { Host, Port, TLSConfig } from '@/network/types';
 import type { KeyPairPem, CertificatePem } from '@/keys/types';
 
@@ -10,6 +10,7 @@ import Logger, { LogLevel, StreamHandler } from '@matrixai/logger';
 
 import { KeyManager } from '@/keys';
 import { NodeManager } from '@/nodes';
+import { Sigchain } from '@/sigchain';
 import { VaultManager } from '@/vaults';
 import { ACL } from '@/acl';
 import { GestaltGraph } from '@/gestalts';
@@ -22,7 +23,6 @@ import { errors as vaultErrors } from '@/vaults';
 import * as keysUtils from '@/keys/utils';
 import { utils as networkUtils } from '@/network';
 import { errors as gitErrors } from '@/git';
-import { resolvesZeroIP } from '@/network/utils';
 
 describe('VaultManager is', () => {
   const logger = new Logger('VaultManager Test', LogLevel.WARN, [
@@ -35,6 +35,7 @@ describe('VaultManager is', () => {
   let gestaltGraph: GestaltGraph;
   let nodeManager: NodeManager;
   let vaultManager: VaultManager;
+  let sigchain: Sigchain;
 
   const sourceHost = '127.0.0.1' as Host;
   const sourcePort = 11112 as Port;
@@ -56,7 +57,6 @@ describe('VaultManager is', () => {
     const keysPath = path.join(dataDir, 'keys');
     const dbPath = path.join(dataDir, 'db');
     const vaultsPath = path.join(dataDir, 'vaults');
-    const nodesPath = path.join(dataDir, 'nodes');
 
     keyManager = new KeyManager({
       keysPath: keysPath,
@@ -75,8 +75,24 @@ describe('VaultManager is', () => {
       egressPort: sourcePort,
     });
 
+    db = new DB({
+      dbPath: dbPath,
+      logger: logger
+    });
+    await db.start({
+      keyPair: keyManager.getRootKeyPair(),
+    });
+
+    sigchain = new Sigchain({
+      keyManager: keyManager,
+      db: db,
+      logger: logger
+    });
+    await sigchain.start();
+
     nodeManager = new NodeManager({
-      nodesPath: nodesPath,
+      db: db,
+      sigchain: sigchain,
       keyManager: keyManager,
       fwdProxy: fwdProxy,
       revProxy: revProxy,
@@ -85,14 +101,6 @@ describe('VaultManager is', () => {
     });
     await nodeManager.start({
       nodeId: 'abc' as NodeId
-    });
-
-    db = new DB({
-      dbPath: dbPath,
-      logger: logger
-    });
-    await db.start({
-      keyPair: keyManager.getRootKeyPair(),
     });
 
     acl = new ACL({
@@ -184,7 +192,7 @@ describe('VaultManager is', () => {
     const result = await vaultManager.deleteVault(secondVault.vaultId);
     expect(result).toBe(true);
     await expect(vaultManager.getVault(firstVault.vaultId)).resolves.toBe(firstVault);
-    await expect(vaultManager.getVault(secondVault.vaultId)).rejects.toThrow(`${secondVault.vaultId} does not exist`);
+    await expect(vaultManager.getVault(secondVault.vaultId)).rejects.toThrow(vaultErrors.ErrorVaultUndefined);
     await expect(vaultManager.getVault(thirdVault.vaultId)).resolves.toBe(thirdVault);
     await vaultManager.stop();
   });
@@ -224,31 +232,31 @@ describe('VaultManager is', () => {
   test('checking gestalt permissions for vaults', async () => {
     const node1: NodeInfo = {
       id: '123' as NodeId,
-      links: { nodes: {}, identities: {} },
+      chain: { nodes: {}, identities: {} },
     };
     const node2: NodeInfo = {
       id: '345' as NodeId,
-      links: { nodes: {}, identities: {} },
+      chain: { nodes: {}, identities: {} },
     };
     const node3: NodeInfo = {
       id: '678' as NodeId,
-      links: { nodes: {}, identities: {} },
+      chain: { nodes: {}, identities: {} },
     };
     const node4: NodeInfo = {
       id: '890' as NodeId,
-      links: { nodes: {}, identities: {} },
+      chain: { nodes: {}, identities: {} },
     };
     const id1: IdentityInfo = {
       providerId: 'github.com' as ProviderId,
       identityId: 'abc' as IdentityId,
-      links: {
+      claims: {
         nodes: {},
       },
     };
     const id2: IdentityInfo = {
       providerId: 'github.com' as ProviderId,
       identityId: 'def' as IdentityId,
-      links: {
+      claims: {
         nodes: {},
       },
     };
@@ -439,6 +447,7 @@ describe('VaultManager is', () => {
     let targetGestaltGraph: GestaltGraph;
     let targetNodeManager: NodeManager;
     let targetVaultManager: VaultManager;
+    let targetSigchain: Sigchain;
 
     let targetNodeId: NodeId;
     let targetKeyPairPem: KeyPairPem;
@@ -453,7 +462,7 @@ describe('VaultManager is', () => {
     beforeEach(async () => {
       node = {
         id: nodeManager.getNodeId(),
-        links: { nodes: {}, identities: {} },
+        chain: { nodes: {}, identities: {} },
       };
       const targetKeyPair = await keysUtils.generateKeyPair(4096);
       targetKeyPairPem = keysUtils.keyPairToPem(targetKeyPair);
@@ -483,8 +492,20 @@ describe('VaultManager is', () => {
         authToken: '',
         logger: logger,
       });
+      targetDb = new DB({
+        dbPath: path.join(targetDataDir, 'db'),
+        logger: logger,
+      });
+      await targetDb.start({ keyPair: keyManager.getRootKeyPair() });
+      targetSigchain = new Sigchain({
+        keyManager: keyManager,
+        db: db,
+        logger: logger
+      });
+      await sigchain.start();
       targetNodeManager = new NodeManager({
-        nodesPath: path.join(targetDataDir, 'nodes'),
+        db: targetDb,
+        sigchain: targetSigchain,
         keyManager: targetKeyManager,
         fwdProxy: targetFwdProxy,
         revProxy: revProxy,
@@ -492,11 +513,6 @@ describe('VaultManager is', () => {
         logger: logger,
       });
       await targetNodeManager.start({ nodeId: targetNodeId });
-      targetDb = new DB({
-        dbPath: path.join(targetDataDir, 'db'),
-        logger: logger,
-      });
-      await targetDb.start({ keyPair: keyManager.getRootKeyPair() });
       targetACL = new ACL({
         db: targetDb,
         logger: logger,
@@ -522,6 +538,7 @@ describe('VaultManager is', () => {
       agentService = createAgentService({
         vaultManager: targetVaultManager,
         nodeManager: targetNodeManager,
+        sigchain: targetSigchain,
       });
       server = new GRPCServer({
         services: [[AgentService, agentService]],
