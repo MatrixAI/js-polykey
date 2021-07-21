@@ -1,3 +1,5 @@
+import type { PassThrough } from 'readable-stream';
+
 type Config = {
   line: string;
   ref?: string;
@@ -28,6 +30,28 @@ type Packfile = {
   [key: string]: any;
 };
 
+type TreeObj = {
+  mode: string;
+  path: string;
+  oid: string;
+  type: string;
+  sha?: string;
+}
+
+type Pack = {
+  packstream: PassThrough;
+  shallows: Set<string>;
+  unshallows: Set<string>;
+  acks: Array<Ack>;
+}
+
+type Commit = {
+  type: string;
+  oid: string;
+  object;
+  error;
+}
+
 type BufferEncoding =
   | 'utf8'
   | 'hex'
@@ -40,4 +64,13 @@ type BufferEncoding =
   | 'latin1'
   | 'binary';
 
-export type { Config, Refs, RefsAdResponse, Ack, Packfile, BufferEncoding };
+export type {
+  Config,
+  Refs,
+  RefsAdResponse,
+  Ack,
+  Packfile,
+  BufferEncoding,
+  TreeObj,
+  Pack,
+};

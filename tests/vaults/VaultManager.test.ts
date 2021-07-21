@@ -201,7 +201,7 @@ describe('VaultManager is', () => {
     await vaultManager.createVault('MyTestVault');
     await vaultManager.createVault('MyOtherTestVault');
     const vn: Array<string> = [];
-    vaultManager.listVaults().forEach((a) => vn.push(a.name));
+    (await vaultManager.listVaults()).forEach((a) => vn.push(a.name));
     expect(vn.sort()).toEqual(['MyTestVault', 'MyOtherTestVault'].sort());
     await vaultManager.stop();
   });
@@ -323,7 +323,7 @@ describe('VaultManager is', () => {
     for (const vaultName of vaultNames) {
       await vaultManager.createVault(vaultName);
     }
-    expect(vaultManager.listVaults().length).toEqual(vaultNames.length);
+    expect((await vaultManager.listVaults()).length).toEqual(vaultNames.length);
     await vaultManager.stop();
   });
   test('able to read and load existing metadata', async () => {
@@ -343,7 +343,7 @@ describe('VaultManager is', () => {
     for (const vaultName of vaultNames) {
       await vaultManager.createVault(vaultName);
     }
-    const vaults = vaultManager.listVaults();
+    const vaults = await vaultManager.listVaults();
     let vaultId: string = '';
     for (const v of vaults) {
       if (v.name === 'Vault1') {
@@ -366,7 +366,7 @@ describe('VaultManager is', () => {
     await gestaltGraph.start();
     await vaultManager.start({});
     const vn: Array<string> = [];
-    vaultManager.listVaults().forEach((a) => vn.push(a.name));
+    (await vaultManager.listVaults()).forEach((a) => vn.push(a.name));
     expect(vn.sort()).toEqual(vaultNames.sort());
     await vaultManager.stop();
   });
@@ -413,7 +413,7 @@ describe('VaultManager is', () => {
     await vaultManager.createVault('Cake');
     await vault9.addSecret('MySecret', 'MyActualPassword');
     const vn: Array<string> = [];
-    vaultManager.listVaults().forEach((a) => vn.push(a.name));
+    (await vaultManager.listVaults()).forEach((a) => vn.push(a.name));
     expect(vn.sort()).toEqual(alteredVaultNames.sort());
     await vaultManager.stop();
     await gestaltGraph.stop();
@@ -432,13 +432,13 @@ describe('VaultManager is', () => {
     const secret = await (await vaultManager.getVault(v102!)).getSecret('MySecret');
     expect(secret.toString()).toBe('MyActualPassword');
     alteredVaultNames.push('Pumpkin');
-    expect(vaultManager.listVaults().length).toEqual(alteredVaultNames.length);
+    expect((await vaultManager.listVaults()).length).toEqual(alteredVaultNames.length);
     await vaultManager.stop();
   });
   /* TESTING TODO:
    *  Changing the default node to pull from
    */
-  describe('interacting with another node to', () => {
+  describe.only('interacting with another node to', () => {
     let targetDataDir: string;
     let targetKeyManager: KeyManager;
     let targetFwdProxy: ForwardProxy;
@@ -599,7 +599,7 @@ describe('VaultManager is', () => {
       await revProxy.openConnection(sourceHost, sourcePort);
       await vaultManager.cloneVault(vault.vaultId, targetNodeId);
       await expect(vaultManager.getDefaultNode(vault.vaultId)).resolves.toBe(targetNodeId);
-      const vaultsList = vaultManager.listVaults();
+      const vaultsList = await vaultManager.listVaults();
       expect(vaultsList[0].name).toStrictEqual('MyFirstVault');
       const clonedVault = await vaultManager.getVault(vaultsList[0].id);
       expect(await clonedVault.getSecret('MyFirstSecret')).toStrictEqual(
@@ -630,7 +630,7 @@ describe('VaultManager is', () => {
       await expect(
         vaultManager.cloneVault(vault.vaultId, targetNodeId),
       ).rejects.toThrow(gitErrors.ErrorGitPermissionDenied);
-      const vaultsList = vaultManager.listVaults();
+      const vaultsList = await vaultManager.listVaults();
       expect(vaultsList).toStrictEqual([]);
       await targetVaultManager.setVaultPermissions(
         nodeManager.getNodeId(),
@@ -645,7 +645,7 @@ describe('VaultManager is', () => {
       await expect(
         vaultManager.pullVault(vault.vaultId, targetNodeId),
       ).rejects.toThrow(gitErrors.ErrorGitPermissionDenied);
-      const list = vaultManager.listVaults();
+      const list = await vaultManager.listVaults();
       const clonedVault = await vaultManager.getVault(list[0].id);
       expect((await clonedVault.listSecrets()).sort()).toStrictEqual(
         ['MyFirstSecret'].sort(),

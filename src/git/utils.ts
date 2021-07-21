@@ -4,6 +4,8 @@ import type {
   Ack,
   Packfile,
   BufferEncoding,
+  TreeObj,
+  Pack,
 } from './types';
 
 import { EncryptedFS } from 'encryptedfs';
@@ -14,9 +16,11 @@ import Hash from 'sha.js/sha1';
 import { PassThrough } from 'readable-stream';
 import createHash from 'sha.js';
 
+import * as utils from '../utils';
 import * as vaultUtils from '../vaults/utils';
+import { errors as gitErrors} from './';
 
-const refpaths = (ref) => [
+const refpaths = (ref: string) => [
   `${ref}`,
   `refs/${ref}`,
   `refs/tags/${ref}`,
@@ -102,34 +106,7 @@ function padHex(bytes: number, length: number): string {
   return '0'.repeat(bytes - s.length) + s;
 }
 
-async function recursiveDirectoryWalk(
-  dir: string,
-  fileSystem: EncryptedFS,
-): Promise<string[]> {
-  return new Promise((resolve) => {
-    let results: string[] = [];
-    fileSystem.readdir(dir, { encoding: 'utf8' }, async (e, list) => {
-      if (list == null) return resolve(results);
-      let pending = list.length;
-      if (!pending) return resolve(results);
-      list.forEach(async function (file) {
-        file = path.resolve(dir, file);
-        fileSystem.stat(file, async (e, stat) => {
-          if (stat && stat.isDirectory()) {
-            const res = await recursiveDirectoryWalk(file, fileSystem);
-            results = results.concat(res);
-            if (!--pending) resolve(results);
-          } else {
-            results.push(file);
-            if (!--pending) resolve(results);
-          }
-        });
-      });
-    });
-  });
-}
-
-function compareRefNames(refa: string, refb: string) {
+function compareRefNames(refa: string, refb: string): number {
   // https://stackoverflow.com/a/40355107/2168416
   const _a = refa.replace(/\^\{\}$/, '');
   const _b = refb.replace(/\^\{\}$/, '');
@@ -171,8 +148,9 @@ function textToPackedRefs(text: string): Refs {
   return refs;
 }
 
-async function packedRefs(fileSystem: EncryptedFS, gitdir: string) {
-  const text = fileSystem.readFileSync(`${gitdir}/packed-refs`, {
+async function packedRefs(fs: EncryptedFS, gitdir: string): Promise<Refs> {
+  const readFile = utils.promisify(fs.readFile).bind(fs);
+  const text = await readFile(path.join(gitdir, 'packed-refs'), {
     encoding: 'utf8',
   });
   const refs = textToPackedRefs(text.toString());
@@ -180,19 +158,17 @@ async function packedRefs(fileSystem: EncryptedFS, gitdir: string) {
 }
 
 async function listRefs(
-  fileSystem: EncryptedFS,
+  fs: EncryptedFS,
   gitdir: string,
   filepath: string,
 ): Promise<string[]> {
-  const packedMap = packedRefs(fileSystem, gitdir);
+  const packedMap = packedRefs(fs, gitdir);
   let files: string[] = [];
   try {
-    for (const file of await vaultUtils.readdirRecursivelyEFS(fileSystem, path.join(gitdir, filepath))) {
+    for (const file of await vaultUtils.readdirRecursivelyEFS(fs, path.join(gitdir, filepath))) {
       files.push(file);
-      // files = await recursiveDirectoryWalk(`${gitdir}/${filepath}`, fileSystem);
     }
-
-    files = files.map((x) => x.replace(`${gitdir}/${filepath}/`, ''));
+    files = files.map((x) => x.replace(path.join(gitdir, filepath, '/'), ''));
   } catch (err) {
     files = [];
   }
@@ -214,11 +190,12 @@ async function listRefs(
 }
 
 async function resolve(
-  fileSystem: EncryptedFS,
+  fs: EncryptedFS,
   gitdir: string,
   ref: string,
   depth?: number,
-) {
+): Promise<string> {
+  const readFile = utils.promisify(fs.readFile).bind(fs);
   if (depth !== undefined) {
     depth--;
     if (depth === -1) {
@@ -228,50 +205,43 @@ async function resolve(
   // Is it a ref pointer?
   if (ref.startsWith('ref: ')) {
     ref = ref.slice('ref: '.length);
-    return resolve(fileSystem, gitdir, ref, depth);
+    return resolve(fs, gitdir, ref, depth);
   }
   // Is it a complete and valid SHA?
   if (ref.length === 40 && /[0-9a-f]{40}/.test(ref)) {
     return ref;
   }
   // We need to alternate between the file system and the packed-refs
-  const packedMap = await packedRefs(fileSystem, gitdir);
+  const packedMap = await packedRefs(fs, gitdir);
   // Look in all the proper paths, in this order
   const allpaths = refpaths(ref).filter((p) => !GIT_FILES.includes(p)); // exclude git system files (#709)
   for (const ref of allpaths) {
-    const sha =
-      fileSystem
-        .readFileSync(`${gitdir}/${ref}`, { encoding: 'utf8' })
-        .toString() || packedMap.get(ref);
+    const sha = (await readFile(path.join(gitdir, ref), { encoding: 'utf8' })).toString()
+      || packedMap.get(ref);
     if (sha) {
-      return resolve(fileSystem, gitdir, sha.trim(), depth);
+      return resolve(fs, gitdir, sha.trim(), depth);
     }
   }
-  // Do we give up?
-  throw new Error('RefNotFound');
+  throw new gitErrors.ErrorGitUndefinedRefs('Refs not found');
 }
 
 async function uploadPack(
-  fileSystem: EncryptedFS,
-  dir: string,
+  fs: EncryptedFS,
   gitdir: string = '.git',
   advertiseRefs = false,
-) {
+): Promise<Array<Buffer> | undefined> {
   try {
     if (advertiseRefs) {
-      // Send a refs advertisement
       const capabilities = ['side-band-64k'];
-      let keys = await listRefs(fileSystem, gitdir, 'refs');
-      keys = keys.map((ref) => `refs/${ref}`);
+      let keys = await listRefs(fs, gitdir, 'refs');
+      keys = keys.map((ref) => path.join('refs', ref));
       const refs = {};
-      keys.unshift('HEAD'); // HEAD must be the first in the list
+      keys.unshift('HEAD');
       for (const key of keys) {
-        refs[key] = await resolve(fileSystem, gitdir, key);
+        refs[key] = await resolve(fs, gitdir, key);
       }
-
       const symrefs = {};
-
-      symrefs['HEAD'] = await resolve(fileSystem, gitdir, 'HEAD', 2);
+      symrefs['HEAD'] = await resolve(fs, gitdir, 'HEAD', 2);
       const write: RefsAdResponse = {
         capabilities: capabilities,
         refs: refs,
@@ -286,75 +256,59 @@ async function uploadPack(
 }
 
 async function packObjects(
-  fileSystem: EncryptedFS,
-  dir: string,
+  fs: EncryptedFS,
+  gitdir: string = '.git',
   refs: string[],
   depth?: number,
   haves?: string[],
-) {
-  const gitdir = '.git';
+): Promise<Pack> {
   const oids = new Set<string>();
   const shallows = new Set<string>();
-  const unshallows = new Set();
+  const unshallows = new Set<string>();
   const acks: Ack[] = [];
-
   haves = haves ? haves : [];
-
-  const emitter = undefined;
   const since = undefined;
   for (const ref of refs) {
-    try {
-      const commits = await log(
-        fileSystem,
-        dir,
-        gitdir,
-        emitter,
-        ref,
-        depth,
-        since,
-      );
-
-      const oldshallows: string[] = [];
-
-      for (let i = 0; i < commits.length; i++) {
-        const commit = commits[i];
-        if (haves.includes(commit.oid)) {
-          acks.push({
-            oid: ref,
-          });
-          break;
-        }
-        oids.add(commit.oid);
-        if (i === commits.length - 1) {
-          if (
-            !oldshallows.includes(commit.oid) &&
-            (depth !== undefined || since !== undefined)
-          ) {
-            console.log('make it shallow', commit.oid);
-            shallows.add(commit.oid);
-          }
-        } else if (oldshallows.includes(commit.oid)) {
-          console.log('make it unshallow', commit.oid);
-          unshallows.add(commit.oid);
-        }
+    const commits = await log(
+      fs,
+      gitdir,
+      ref,
+      depth,
+      since,
+    );
+    const oldshallows: string[] = [];
+    for (let i = 0; i < commits.length; i++) {
+      const commit = commits[i];
+      if (haves.includes(commit.oid)) {
+        acks.push({
+          oid: ref,
+        });
+        break;
       }
-    } catch (err) {
-      console.log(err);
-      // oh well.
+      oids.add(commit.oid);
+      if (i === commits.length - 1) {
+        if (
+          !oldshallows.includes(commit.oid) &&
+          (depth !== undefined || since !== undefined)
+        ) {
+          shallows.add(commit.oid);
+        }
+      } else if (oldshallows.includes(commit.oid)) {
+        unshallows.add(commit.oid);
+      }
     }
   }
-  const objects = await listObjects(fileSystem, dir, gitdir, Array.from(oids));
+  const objects = await listObjects(fs, gitdir, Array.from(oids));
   const packstream = new PassThrough();
-  pack(fileSystem, dir, undefined, [...objects], packstream);
+  pack(fs, gitdir, [...objects], packstream);
   return { packstream, shallows, unshallows, acks };
 }
 
 async function listObjects(
-  fileSystem: EncryptedFS,
-  dir: string,
-  gitdir: string = path.join(dir, '.git'),
+  fs: EncryptedFS,
+  gitdir = '.git',
   oids: string[],
-) {
+): Promise<Array<string>> {
   const commits = new Set<string>();
   const trees = new Set<string>();
   const blobs = new Set<string>();
@@ -363,8 +317,8 @@ async function listObjects(
   // avoid reading Blob objects entirely since the Tree objects
   // tell us which oids are Blobs and which are Trees. And we
   // do not need to recurse through commit parents.
-  async function walk(oid) {
-    const { type, object } = await read(fileSystem, gitdir, oid);
+  async function walk(oid: string): Promise<void> {
+    const { type, object } = await read(fs, gitdir, oid);
     if (type === 'commit') {
       commits.add(oid);
       const commit = commitFrom(object);
@@ -392,8 +346,8 @@ async function listObjects(
   return [...commits, ...trees, ...blobs];
 }
 
-function treeFrom(entries): Array<any> {
-  let entriesa;
+function treeFrom(entries: TreeObj): Array<TreeObj> {
+  let entriesa: Array<TreeObj> = [];
   if (Buffer.isBuffer(entries)) {
     entriesa = parseBuffer(entries);
   } else if (Array.isArray(entries)) {
@@ -404,7 +358,7 @@ function treeFrom(entries): Array<any> {
   return entriesa;
 }
 
-function nudgeIntoShape(entry) {
+function nudgeIntoShape(entry: TreeObj): TreeObj {
   if (!entry.oid && entry.sha) {
     entry.oid = entry.sha; // Github
   }
@@ -415,7 +369,7 @@ function nudgeIntoShape(entry) {
   return entry;
 }
 
-function limitModeToAllowed(mode) {
+function limitModeToAllowed(mode: string | number): string {
   if (typeof mode === 'number') {
     mode = mode.toString(8);
   }
@@ -425,22 +379,22 @@ function limitModeToAllowed(mode) {
   if (mode.match(/^1007.*/)) return '100755'; // Regular executable file
   if (mode.match(/^120.*/)) return '120000'; // Symbolic link
   if (mode.match(/^160.*/)) return '160000'; // Commit (git submodule reference)
-  throw new Error(`Could not understand file mode: ${mode}`);
+  throw new gitErrors.ErrorGitUndefinedFileMode(`Could not understand file mode: ${mode}`);
 }
 
-function parseBuffer(buffer) {
-  const _entries: any[] = [];
+function parseBuffer(buffer: Buffer): Array<TreeObj> {
+  const _entries: TreeObj[] = [];
   let cursor = 0;
   while (cursor < buffer.length) {
     const space = buffer.indexOf(32, cursor);
     if (space === -1) {
-      throw new Error(
+      throw new gitErrors.ErrorGitBufferParse(
         `GitTree: Error parsing buffer at byte location ${cursor}: Could not find the next space character.`,
       );
     }
     const nullchar = buffer.indexOf(0, cursor);
     if (nullchar === -1) {
-      throw new Error(
+      throw new gitErrors.ErrorGitBufferParse(
         `GitTree: Error parsing buffer at byte location ${cursor}: Could not find the next null character.`,
       );
     }
@@ -456,12 +410,11 @@ function parseBuffer(buffer) {
 }
 
 async function log(
-  fileSystem: EncryptedFS,
-  dir,
+  fs: EncryptedFS,
   gitdir = '.git',
   ref = 'HEAD',
-  depth,
-  since, // Date
+  depth: number | undefined,
+  since: number | undefined, // Date
   signing = false,
 ) {
   try {
@@ -470,8 +423,8 @@ async function log(
     // TODO: In the future, we may want to have an API where we return a
     // async iterator that emits commits.
     const commits: any[] = [];
-    const oid = await resolve(fileSystem, gitdir, ref);
-    const tips = [await logCommit(fileSystem, gitdir, oid, signing)];
+    const oid = await resolve(fs, gitdir, ref);
+    const tips = [await logCommit(fs, gitdir, oid, signing)];
 
     // eslint-disable-next-line
     while (true) {
@@ -499,7 +452,7 @@ async function log(
       // Add the parents of this commit to the queue
       // Note: for the case of a commit with no parents, it will concat an empty array, having no net effect.
       for (const oid of commit.parent) {
-        const commit = await logCommit(fileSystem, gitdir, oid, signing);
+        const commit = await logCommit(fs, gitdir, oid, signing);
         if (!tips.map((commit) => commit.oid).includes(commit.oid)) {
           tips.push(commit);
         }
@@ -523,13 +476,13 @@ function compareAge(a, b) {
 }
 
 async function logCommit(
-  fileSystem: EncryptedFS,
+  fs: EncryptedFS,
   gitdir: string,
   oid: string,
   signing: boolean,
 ) {
   try {
-    const { type, object } = await read(fileSystem, gitdir, oid);
+    const { type, object } = await read(fs, gitdir, oid);
     if (type !== 'commit') {
       throw new Error('expected type to be commit');
     }
@@ -705,24 +658,26 @@ function commitFrom(commit): string {
 const PackfileCache: Packfile = {};
 
 async function read(
-  fileSystem: EncryptedFS,
+  fs: EncryptedFS,
   gitdir: string,
   oid: string,
   format = 'content',
 ) {
+  const readFile = utils.promisify(fs.readFile).bind(fs);
+  const readdir = utils.promisify(fs.readdir).bind(fs);
   // Look for it in the loose object directory.
-  const file = fileSystem.readFileSync(
-    `${gitdir}/objects/${oid.slice(0, 2)}/${oid.slice(2)}`,
+  const file = await readFile(
+    path.join(gitdir, 'objects', oid.slice(0, 2), oid.slice(2)),
   );
-  const source = `./objects/${oid.slice(0, 2)}/${oid.slice(2)}`;
+  const source = path.join('.', 'objects', oid.slice(0, 2), oid.slice(2));
   // Check to see if it's in a packfile.
   if (!file) {
     // Curry the current read method so that the packfile un-deltification
     // process can acquire external ref-deltas.
-    const getExternalRefDelta = (oid: string) => read(fileSystem, gitdir, oid);
+    const getExternalRefDelta = (oid: string) => read(fs, gitdir, oid);
     // Iterate through all the .pack files
-    let list = fileSystem.readdirSync(path.join(gitdir, '/objects/pack'));
-    list = list.filter((x) => x.endsWith('.pack'));
+    let list: Array<string> = await readdir(path.join(gitdir, '/objects/pack'));
+    list = list.filter((x: string) => x.endsWith('.pack'));
     for (const filename of list) {
       // Try to get the packfile from the in-memory cache
       const p = PackfileCache[filename];
@@ -730,21 +685,21 @@ async function read(
       if (p.offsets.has(oid)) {
         // Make sure the packfile is loaded in memory
         if (!p.pack) {
-          const pack = fileSystem.readFileSync(
-            `${gitdir}/objects/pack/${filename}`,
+          const pack: string = await readFile(
+            path.join(gitdir, 'objects/pack', filename),
           );
           await p.load({ pack });
         }
         // Get the resolved git object from the packfile
         const result = await p.read({ oid, getExternalRefDelta });
-        result.source = `./objects/pack/${filename}`;
+        result.source = path.join('./objects/pack', filename);
         return result;
       }
     }
   }
   // Check to see if it's in shallow commits.
   if (!file) {
-    const text = fileSystem.readFileSync(`${gitdir}/shallow`, {
+    const text = await readFile(path.join(gitdir, 'shallow'), {
       encoding: 'utf8',
     });
     if (text !== null && text.includes(oid)) {
@@ -770,7 +725,9 @@ function unwrap({ oid, buffer }) {
   if (oid) {
     const sha = new Hash().update(buffer).digest('hex');
     if (sha !== oid) {
-      throw new Error(`SHA check failed! Expected ${oid}, computed ${sha}`);
+      throw new gitErrors.ErrorGitInvalidSha(
+        `SHA check failed! Expected ${oid}, computed ${sha}`
+      );
     }
   }
   const s = buffer.indexOf(32); // first space
@@ -780,7 +737,7 @@ function unwrap({ oid, buffer }) {
   const actualLength = buffer.length - (i + 1);
   // verify length
   if (parseInt(length) !== actualLength) {
-    throw new Error(
+    throw new gitErrors.ErrorGitType(
       `Length mismatch: expected ${length} bytes but got ${actualLength} instead.`,
     );
   }
@@ -791,12 +748,11 @@ function unwrap({ oid, buffer }) {
 }
 
 async function pack(
-  fileSystem: EncryptedFS,
-  dir: string,
+  fs: EncryptedFS,
   gitdir: string = '.git',
   oids: string[],
   outputStream: PassThrough,
-) {
+): Promise<PassThrough> {
   const hash = createHash('sha1');
   function write(chunk: any, enc?: BufferEncoding) {
     if (enc) {
@@ -809,7 +765,7 @@ async function pack(
   function writeObject(object: any, stype: any) {
     // Object type is encoded in bits 654
     const type = types[stype];
-    if (type === undefined) throw new Error('Unrecognized type: ' + stype);
+    if (type === undefined) throw new gitErrors.ErrorGitType('Unrecognized type: ' + stype);
     // The length encoding get complicated.
     let length = object.length;
     // Whether the next byte is part of the variable-length encoded number
@@ -843,7 +799,7 @@ async function pack(
   const paddedChunk = '0'.repeat(8 - unpaddedChunk.length) + unpaddedChunk;
   write(paddedChunk, 'hex');
   for (const oid of oids) {
-    const { type, object } = await read(fileSystem, gitdir, oid);
+    const { type, object } = await read(fs, gitdir, oid);
     writeObject(object, type);
   }
   // Write SHA1 checksum
@@ -857,7 +813,7 @@ function mux(
   packetlines: PassThrough,
   packfile: PassThrough,
   progress: PassThrough,
-) {
+): PassThrough {
   const MAX_PACKET_LENGTH = protocol === 'side-band-64k' ? 999 : 65519;
   const output = new PassThrough();
   packetlines.on('data', (data: Buffer) => {
@@ -902,7 +858,7 @@ function mux(
   return output;
 }
 
-function splitBuffer(buffer: Buffer, maxBytes: number) {
+function splitBuffer(buffer: Buffer, maxBytes: number): Array<Buffer> {
   const result: Buffer[] = [];
   let index = 0;
   while (index < buffer.length) {

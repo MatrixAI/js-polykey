@@ -580,8 +580,7 @@ class Vault {
 
     for (const buffer of (await gitUtils.uploadPack(
       this.efs,
-      this.vaultId,
-      undefined,
+      '.git',
       true,
     )) ?? []) {
       yield buffer;
@@ -600,9 +599,8 @@ class Vault {
       const wantedObjectId = body.toString().slice(9, 49);
       const packResult = await gitUtils.packObjects(
         this.efs,
-        this.vaultId,
+        '.git',
         [wantedObjectId],
-        undefined,
       );
       const readable = new PassThrough();
       const progressStream = new PassThrough();

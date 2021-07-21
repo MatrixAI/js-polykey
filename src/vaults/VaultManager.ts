@@ -266,7 +266,7 @@ class VaultManager {
     newVaultName: string,
   ): Promise<boolean> {
     if (!this.vaults[vaultId]) {
-      throw new vaultErrors.ErrorVaultUndefined(`${vaultId} does not exist`);
+      await this.setupVault(vaultId);
     }
     const vault = this.vaults[vaultId];
     await this.renameVaultOps(vault.vaultName, newVaultName);
@@ -280,6 +280,9 @@ class VaultManager {
    * @returns the stats of the vault directory
    */
   public async vaultStats(vaultId: string): Promise<fs.Stats> {
+    if (!this.vaults[vaultId]) {
+      await this.setupVault(vaultId);
+    }
     const vault = this.vaults[vaultId];
     return await vault.stats();
   }
@@ -297,9 +300,7 @@ class VaultManager {
     return await this._transaction(async () => {
       return await this.acl._transaction(async () => {
         if (!this.vaults[vaultId]) {
-          throw new vaultErrors.ErrorVaultUndefined(
-            `Vault does not exist: '${vaultId}'`,
-          );
+          await this.setupVault(vaultId);
         }
         await this.vaults[vaultId].stop();
         const vaultPath = this.vaults[vaultId].baseDir;
@@ -310,7 +311,6 @@ class VaultManager {
         const name = this.vaults[vaultId].vaultName;
         await this.deleteVaultOps(name);
         await this.acl.unsetVaultPerms(vaultId as VaultId);
-        // Remove from mappings
         delete this.vaults[vaultId];
         return true;
       });
@@ -322,12 +322,15 @@ class VaultManager {
    *
    * @returns Array of VaultName and VaultIds managed currently by the vault manager
    */
-  public listVaults(): Array<{ name: string; id: string }> {
+  public async listVaults(): Promise<Array<{ name: string; id: string }>> {
     const vaults: Array<{ name: string; id: string }> = [];
-    for (const id in this.vaults) {
+    for await (const o of this.vaultsNamesDb.createReadStream({})) {
+      const id = (o as any).value;
+      const name = (o as any).key as string;
+      const vaultId = this.db.unserializeDecrypt<VaultId>(id) as string;
       vaults.push({
-        name: this.vaults[id].vaultName,
-        id,
+        name: name,
+        id: vaultId,
       });
     }
     return vaults;
@@ -351,19 +354,17 @@ class VaultManager {
     nodeId: string,
   ): Promise<Array<{ name: string; id: string }>> {
     return await this.acl._transaction(async () => {
-      const vaults: Array<{ name: string; id: string }> = [];
-      for (const id in this.vaults) {
-        const list = await this.acl.getVaultPerm(id as VaultId);
+      const vaults = await this.listVaults();
+      const scan: Array<{ name: string; id: string }> = [];
+      for (const vault of vaults) {
+        const list = await this.acl.getVaultPerm(vault.id as VaultId);
         if (list[nodeId]) {
-          if (list[nodeId].vaults[id]['pull'] !== undefined) {
-            vaults.push({
-              name: this.vaults[id].vaultName,
-              id: id,
-            });
+          if (list[nodeId].vaults[vault.id]['pull'] !== undefined) {
+            scan.push(vault);
           }
         }
       }
-      return vaults;
+      return scan;
     });
   }
 
@@ -376,10 +377,9 @@ class VaultManager {
    */
   public async setDefaultNode(vaultId: string, nodeId: string): Promise<void> {
     if (!this.vaults[vaultId]) {
-      throw new vaultErrors.ErrorVaultUndefined(`${vaultId} does not exist`);
-    } else {
-      await this.setVaultNodebyVaultId(vaultId as VaultId, nodeId);
+      await this.setupVault(vaultId);
     }
+    await this.setVaultNodebyVaultId(vaultId as VaultId, nodeId);
   }
 
   /**
@@ -591,8 +591,16 @@ class VaultManager {
    */
   private async generateVaultId(): Promise<string> {
     let vaultId = await vaultUtils.generateVaultId();
-    const i = 0;
-    while (this.vaults[vaultId]) {
+    let i = 0;
+    while (1) {
+      try {
+        await this.getVault(vaultId);
+      } catch (e) {
+        if (e instanceof vaultErrors.ErrorVaultUndefined) {
+          break;
+        }
+      }
+      i++;
       if (i > 50) {
         throw new vaultErrors.ErrorCreateVaultId(
           'Could not create a unique vaultId after 50 attempts',
